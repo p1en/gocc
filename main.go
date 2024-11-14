@@ -4,9 +4,15 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"unicode"
 )
 
+//
+// Tokenizer
+//
+
+// Token kind
 type TokenKind int
 
 const (
@@ -15,6 +21,7 @@ const (
 	TK_EOF                       // End-of-file markers
 )
 
+// Token type
 type Token struct {
 	kind TokenKind // Token kind
 	next *Token    // Next token
@@ -124,7 +131,7 @@ func tokenize() *Token {
 		}
 
 		// Punctuator
-		if c == '+' || c == '-' {
+		if strings.ContainsRune("+-*/()", rune(c)) {
 			cur = newToken(TK_RESERVED, cur, p[:1])
 			p = p[1:]
 			continue
@@ -139,7 +146,7 @@ func tokenize() *Token {
 			continue
 		}
 
-		reportErrorAt(p, "expected a number")
+		reportErrorAt(p, "invalid token")
 	}
 
 	newToken(TK_EOF, cur, "")
@@ -147,29 +154,129 @@ func tokenize() *Token {
 	return head.next
 }
 
+//
+// Parser
+//
+
+// AST node kind
+type NodeKind int
+
+const (
+	ND_ADD NodeKind = iota // +
+	ND_SUB                 // -
+	ND_MUL                 // *
+	ND_DIV                 // /
+	ND_NUM                 // Integer
+)
+
+// AST node type
+type Node struct {
+	kind NodeKind // Node kind
+	lhs  *Node    // Left-hand side
+	rhs  *Node    // Right-hand side
+	val  int      // Used if kind == ND_NUM
+}
+
+func newBinary(kind NodeKind, lhs *Node, rhs *Node) *Node {
+	return &Node{kind: kind, lhs: lhs, rhs: rhs}
+}
+
+func newNum(val int) *Node {
+	return &Node{kind: ND_NUM, val: val}
+}
+
+// expr = mul ("+" mul | "-" mul)*
+func expr() *Node {
+	node := mul()
+
+	for {
+		if consume('+') {
+			node = newBinary(ND_ADD, node, mul())
+		} else if consume('-') {
+			node = newBinary(ND_SUB, node, mul())
+		} else {
+			return node
+		}
+	}
+}
+
+// mul = primary ("*" primary | "/" primary)*
+func mul() *Node {
+	node := primary()
+
+	for {
+		if consume('*') {
+			node = newBinary(ND_MUL, node, primary())
+		} else if consume('/') {
+			node = newBinary(ND_DIV, node, primary())
+		} else {
+			return node
+		}
+	}
+}
+
+// primary = "(" expr ")" | num
+func primary() *Node {
+	if consume('(') {
+		node := expr()
+		expect(')')
+
+		return node
+	}
+
+	return newNum(expectNumber())
+}
+
+//
+// Code generator
+//
+
+func gen(node *Node) {
+	if node.kind == ND_NUM {
+		fmt.Printf("  push %d\n", node.val)
+		return
+	}
+
+	gen(node.lhs)
+	gen(node.rhs)
+
+	fmt.Printf("  pop rdi\n")
+	fmt.Printf("  pop rax\n")
+
+	switch node.kind {
+	case ND_ADD:
+		fmt.Printf("  add rax, rdi\n")
+	case ND_SUB:
+		fmt.Printf("  sub rax, rdi\n")
+	case ND_MUL:
+		fmt.Printf("  imul rax, rdi\n")
+	case ND_DIV:
+		fmt.Printf("  cqo\n")
+		fmt.Printf("  idiv rdi\n")
+	}
+
+	fmt.Printf("  push rax\n")
+}
+
 func main() {
 	if len(os.Args) != 2 {
 		reportError("%s: invalid number of arguments", os.Args[0])
 	}
 
+	// Tokenize and parse.
 	userInput = os.Args[1]
 	token = tokenize()
+	node := expr()
 
+	// Print out the first half of assembly.
 	fmt.Printf(".intel_syntax noprefix\n")
 	fmt.Printf(".global main\n")
 	fmt.Printf("main:\n")
 
-	fmt.Printf("  mov rax, %d\n", expectNumber())
+	// Traverse the AST to emit assembly.
+	gen(node)
 
-	for !atEOF() {
-		if consume('+') {
-			fmt.Printf("  add rax, %d\n", expectNumber())
-			continue
-		}
-
-		expect('-')
-		fmt.Printf("  sub rax, %d\n", expectNumber())
-	}
-
+	// A result must be at the top of the stack, so pop it to RAX to make it a program exit code.
+	fmt.Printf("  pop rax\n")
 	fmt.Printf("  ret\n")
 }
