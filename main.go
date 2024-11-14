@@ -22,6 +22,9 @@ type Token struct {
 	str  string    // Token string
 }
 
+// Input program
+var userInput string
+
 // Current token
 var token *Token
 
@@ -50,6 +53,17 @@ func reportError(format string, a ...any) {
 	os.Exit(1)
 }
 
+// Reports an error location and exit.
+func reportErrorAt(loc string, format string, a ...any) {
+	pos := len(userInput) - len(loc)
+	fmt.Fprintf(os.Stderr, "%s\n", userInput)
+	fmt.Fprintf(os.Stderr, "%*s", pos, " ")
+	fmt.Fprintf(os.Stderr, "^ ")
+	fmt.Fprintf(os.Stderr, format, a...)
+	fmt.Fprintf(os.Stderr, "\n")
+	os.Exit(1)
+}
+
 // Consumes the current token if it matches `op`.
 func consume(op byte) bool {
 	if token.kind != TK_RESERVED || token.str[0] != op {
@@ -64,7 +78,7 @@ func consume(op byte) bool {
 // Ensure that the current token is `op`.
 func expect(op byte) {
 	if token.kind != TK_RESERVED || token.str[0] != op {
-		reportError("expected '%c'", op)
+		reportErrorAt(token.str, "expected '%c'", op)
 	}
 
 	token = token.next
@@ -73,7 +87,7 @@ func expect(op byte) {
 // Ensure that the current token is TK_NUM.
 func expectNumber() int {
 	if token.kind != TK_NUM {
-		reportError("expected a number")
+		reportErrorAt(token.str, "expected a number")
 	}
 
 	val := token.val
@@ -94,8 +108,9 @@ func newToken(kind TokenKind, cur *Token, str string) *Token {
 	return tok
 }
 
-// Tokenize `p` and returns new tokens.
-func tokenize(p string) *Token {
+// Tokenize `user_input` and returns new tokens.
+func tokenize() *Token {
+	p := userInput
 	head := &Token{}
 	cur := head
 
@@ -124,7 +139,7 @@ func tokenize(p string) *Token {
 			continue
 		}
 
-		reportError("invalid token")
+		reportErrorAt(p, "expected a number")
 	}
 
 	newToken(TK_EOF, cur, "")
@@ -137,7 +152,8 @@ func main() {
 		reportError("%s: invalid number of arguments", os.Args[0])
 	}
 
-	token = tokenize(os.Args[1])
+	userInput = os.Args[1]
+	token = tokenize()
 
 	fmt.Printf(".intel_syntax noprefix\n")
 	fmt.Printf(".global main\n")
