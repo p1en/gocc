@@ -7,6 +7,25 @@ import (
 	"unicode"
 )
 
+type TokenKind int
+
+const (
+	TK_RESERVED TokenKind = iota // Keywords or punctuators
+	TK_NUM                       // Integer literals
+	TK_EOF                       // End-of-file markers
+)
+
+type Token struct {
+	kind TokenKind // Token kind
+	next *Token    // Next token
+	val  int       // If kind is TK_NUM, its value
+	str  string    // Token string
+}
+
+// Current token
+var token *Token
+
+// Returns the first numerical value found and its number of characters.
 func getNum(str string) (int, int) {
 	var s string
 	var cnt int
@@ -25,38 +44,115 @@ func getNum(str string) (int, int) {
 	return result, cnt
 }
 
-func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "%s: invalid number of arguments\n", os.Args[0])
-		os.Exit(1)
+// Reports an error and exit.
+func reportError(format string, a ...any) {
+	fmt.Fprintf(os.Stderr, format, a...)
+	os.Exit(1)
+}
+
+// Consumes the current token if it matches `op`.
+func consume(op byte) bool {
+	if token.kind != TK_RESERVED || token.str[0] != op {
+		return false
 	}
 
-	p := os.Args[1]
+	token = token.next
+
+	return true
+}
+
+// Ensure that the current token is `op`.
+func expect(op byte) {
+	if token.kind != TK_RESERVED || token.str[0] != op {
+		reportError("expected '%c'", op)
+	}
+
+	token = token.next
+}
+
+// Ensure that the current token is TK_NUM.
+func expectNumber() int {
+	if token.kind != TK_NUM {
+		reportError("expected a number")
+	}
+
+	val := token.val
+	token = token.next
+
+	return val
+}
+
+func atEOF() bool {
+	return token.kind == TK_EOF
+}
+
+// Create a new token and add it as the next token of `cur`.
+func newToken(kind TokenKind, cur *Token, str string) *Token {
+	tok := &Token{kind: kind, str: str}
+	cur.next = tok
+
+	return tok
+}
+
+// Tokenize `p` and returns new tokens.
+func tokenize(p string) *Token {
+	head := &Token{}
+	cur := head
+
+	for len(p) > 0 {
+		c := p[0]
+
+		// Skip whitespace characters.
+		if c == ' ' {
+			p = p[1:]
+			continue
+		}
+
+		// Punctuator
+		if c == '+' || c == '-' {
+			cur = newToken(TK_RESERVED, cur, p[:1])
+			p = p[1:]
+			continue
+		}
+
+		// Integer literal
+		if unicode.IsDigit(rune(c)) {
+			n, cnt := getNum(p)
+			cur = newToken(TK_NUM, cur, p[:cnt])
+			cur.val = n
+			p = p[cnt:]
+			continue
+		}
+
+		reportError("invalid token")
+	}
+
+	newToken(TK_EOF, cur, "")
+
+	return head.next
+}
+
+func main() {
+	if len(os.Args) != 2 {
+		reportError("%s: invalid number of arguments", os.Args[0])
+	}
+
+	token = tokenize(os.Args[1])
 
 	fmt.Printf(".intel_syntax noprefix\n")
 	fmt.Printf(".global main\n")
 	fmt.Printf("main:\n")
 
-	n, cnt := getNum(p)
-	fmt.Printf("  mov rax, %d\n", n)
-	p = p[cnt:]
+	fmt.Printf("  mov rax, %d\n", expectNumber())
 
-	for len(p) > 0 {
-		switch p[0] {
-		case '+':
-			p = p[1:]
-			n, cnt := getNum(p)
-			fmt.Printf("  add rax, %d\n", n)
-			p = p[cnt:]
-		case '-':
-			p = p[1:]
-			n, cnt := getNum(p)
-			fmt.Printf("  sub rax, %d\n", n)
-			p = p[cnt:]
-		default:
-			fmt.Fprintf(os.Stderr, "unexpected character: %q\n", p[0])
-			os.Exit(1)
+	for !atEOF() {
+		if consume('+') {
+			fmt.Printf("  add rax, %d\n", expectNumber())
+			continue
 		}
+
+		expect('-')
+		fmt.Printf("  sub rax, %d\n", expectNumber())
 	}
 
 	fmt.Printf("  ret\n")
