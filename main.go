@@ -200,19 +200,33 @@ func expr() *Node {
 	}
 }
 
-// mul = primary ("*" primary | "/" primary)*
+// mul = unary ("*" unary | "/" unary)*
 func mul() *Node {
-	node := primary()
+	node := unary()
 
 	for {
 		if consume('*') {
-			node = newBinary(ND_MUL, node, primary())
+			node = newBinary(ND_MUL, node, unary())
 		} else if consume('/') {
-			node = newBinary(ND_DIV, node, primary())
+			node = newBinary(ND_DIV, node, unary())
 		} else {
 			return node
 		}
 	}
+}
+
+// unary = ("+" | "-")? unary
+//       | primary
+func unary() *Node {
+	if consume('+') {
+		return unary()
+	}
+
+	if consume('-') {
+		return newBinary(ND_SUB, newNum(0), unary())
+	}
+
+	return primary()
 }
 
 // primary = "(" expr ")" | num
