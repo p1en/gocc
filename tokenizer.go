@@ -134,6 +134,27 @@ func isAlnum(c byte) bool {
 	return isAlpha(c) || unicode.IsDigit(rune(c))
 }
 
+func startsWithReserved(p string) string {
+	// Keyword
+	kw := []string{"return", "if", "else"}
+	for _, v := range kw {
+		l := len(v)
+		if startswith(p, v) && !isAlnum(p[l]) {
+			return v
+		}
+	}
+
+	// Multi-letter punctuator
+	ops := []string{"==", "!=", "<=", ">="}
+	for _, v := range ops {
+		if startswith(p, v) {
+			return v
+		}
+	}
+
+	return ""
+}
+
 // Tokenize `userInput` and returns new tokens.
 func tokenize() *Token {
 	p := userInput
@@ -149,17 +170,12 @@ func tokenize() *Token {
 			continue
 		}
 
-		// Keyword
-		if startswith(p, "return") && !isAlnum(p[6]) {
-			cur = newToken(TK_RESERVED, cur, p, 6)
-			p = p[6:]
-			continue
-		}
-
-		// Multi-letter punctuator
-		if startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=") {
-			cur = newToken(TK_RESERVED, cur, p, 2)
-			p = p[2:]
+		// Keyword or multi-letter punctuator
+		kw := startsWithReserved(p)
+		if kw != "" {
+			l := len(kw)
+			cur = newToken(TK_RESERVED, cur, p, l)
+			p = p[l:]
 			continue
 		}
 

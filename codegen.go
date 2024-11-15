@@ -2,6 +2,8 @@ package main
 
 import "fmt"
 
+var labelseq int
+
 // Pushes the given node's address to the stack.
 func genAddr(node *Node) {
 	if node.kind == ND_VAR {
@@ -44,6 +46,28 @@ func gen(node *Node) {
 		genAddr(node.lhs)
 		gen(node.rhs)
 		store()
+		return
+	case ND_IF:
+		seq := labelseq
+		labelseq++
+		if node.els != nil {
+			gen(node.cond)
+			fmt.Printf("  pop rax\n")
+			fmt.Printf("  cmp rax, 0\n")
+			fmt.Printf("  je  .Lelse%d\n", seq)
+			gen(node.then)
+			fmt.Printf("  jmp .Lend%d\n", seq)
+			fmt.Printf(".Lelse%d:\n", seq)
+			gen(node.els)
+			fmt.Printf(".Lend%d:\n", seq)
+		} else {
+			gen(node.cond)
+			fmt.Printf("  pop rax\n")
+			fmt.Printf("  cmp rax, 0\n")
+			fmt.Printf("  je  .Lend%d\n", seq)
+			gen(node.then)
+			fmt.Printf(".Lend%d:\n", seq)
+		}
 		return
 	case ND_RETURN:
 		gen(node.lhs)

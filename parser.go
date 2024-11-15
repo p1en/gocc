@@ -20,6 +20,7 @@ const (
 	ND_LE                        // <=
 	ND_ASSIGN                    // =
 	ND_RETURN                    // "return"
+	ND_IF                        // "if"
 	ND_EXPR_STMT                 // Expression statement
 	ND_VAR                       // Variable
 	ND_NUM                       // Integer
@@ -27,10 +28,16 @@ const (
 
 // AST node type
 type Node struct {
-	kind     NodeKind  // Node kind
-	next     *Node     // Next node
-	lhs      *Node     // Left-hand side
-	rhs      *Node     // Right-hand side
+	kind NodeKind // Node kind
+	next *Node    // Next node
+	lhs  *Node    // Left-hand side
+	rhs  *Node    // Right-hand side
+
+	// "if" statement
+	cond *Node
+	then *Node
+	els  *Node
+
 	variable *Variable // Used if kind == ND_VAR
 	val      int       // Used if kind == ND_NUM
 }
@@ -90,8 +97,13 @@ func program() *Program {
 	return &Program{node: head.next, locals: locals}
 }
 
+func readExprStmt() *Node {
+	return newUnary(ND_EXPR_STMT, expr())
+}
+
 // stmt = "return" expr ";"
 //
+//	| "if" "(" expr ")" stmt ("else" stmt)?
 //	| expr ";"
 func stmt() *Node {
 	if consume("return") {
@@ -101,7 +113,21 @@ func stmt() *Node {
 		return node
 	}
 
-	node := newUnary(ND_EXPR_STMT, expr())
+	if consume("if") {
+		node := &Node{kind: ND_IF}
+		expect("(")
+		node.cond = expr()
+		expect(")")
+		node.then = stmt()
+
+		if consume("else") {
+			node.els = stmt()
+		}
+
+		return node
+	}
+
+	node := readExprStmt()
 	expect(";")
 
 	return node
