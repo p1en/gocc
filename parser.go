@@ -4,16 +4,17 @@ package main
 type NodeKind int
 
 const (
-	ND_ADD    NodeKind = iota // +
-	ND_SUB                    // -
-	ND_MUL                    // *
-	ND_DIV                    // /
-	ND_EQ                     // ==
-	ND_NE                     // !=
-	ND_LT                     // <
-	ND_LE                     // <=
-	ND_RETURN                 // "return"
-	ND_NUM                    // Integer
+	ND_ADD       NodeKind = iota // +
+	ND_SUB                       // -
+	ND_MUL                       // *
+	ND_DIV                       // /
+	ND_EQ                        // ==
+	ND_NE                        // !=
+	ND_LT                        // <
+	ND_LE                        // <=
+	ND_RETURN                    // "return"
+	ND_EXPR_STMT                 // Expression statement
+	ND_NUM                       // Integer
 )
 
 // AST node type
@@ -61,7 +62,7 @@ func stmt() *Node {
 		return node
 	}
 
-	node := expr()
+	node := newUnary(ND_EXPR_STMT, expr())
 	expect(";")
 
 	return node

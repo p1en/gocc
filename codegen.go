@@ -7,6 +7,10 @@ func gen(node *Node) {
 	case ND_NUM:
 		fmt.Printf("  push %d\n", node.val)
 		return
+	case ND_EXPR_STMT:
+		gen(node.lhs)
+		fmt.Printf("  add rsp, 8\n")
+		return
 	case ND_RETURN:
 		gen(node.lhs)
 		fmt.Printf("  pop rax\n")
@@ -58,7 +62,6 @@ func codegen(node *Node) {
 
 	for n := node; n != nil; n = n.next {
 		gen(n)
-		fmt.Printf("  pop rax\n")
 	}
 
 	fmt.Printf("  ret\n")
