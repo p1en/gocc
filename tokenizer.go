@@ -13,6 +13,7 @@ type TokenKind int
 
 const (
 	TK_RESERVED TokenKind = iota // Keywords or punctuators
+	TK_IDENT                     // Identifiers
 	TK_NUM                       // Integer literals
 	TK_EOF                       // End-of-file markers
 )
@@ -74,6 +75,18 @@ func consume(op string) bool {
 	token = token.next
 
 	return true
+}
+
+// Consumes the current token if it is an identifier.
+func consumeIdent() *Token {
+	if token.kind != TK_IDENT {
+		return nil
+	}
+
+	t := token
+	token = token.next
+
+	return t
 }
 
 // Ensure that the current token is `op`.
@@ -151,8 +164,15 @@ func tokenize() *Token {
 		}
 
 		// Single-letter punctuator
-		if strings.ContainsRune("+-*/()<>;", rune(c)) {
+		if strings.ContainsRune("+-*/()<>;=", rune(c)) {
 			cur = newToken(TK_RESERVED, cur, p[:1], 1)
+			p = p[1:]
+			continue
+		}
+
+		// Identifier
+		if unicode.IsLetter(rune(c)) {
+			cur = newToken(TK_IDENT, cur, p[:1], 1)
 			p = p[1:]
 			continue
 		}

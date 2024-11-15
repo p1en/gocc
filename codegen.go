@@ -2,6 +2,32 @@ package main
 
 import "fmt"
 
+// Pushes the given node's address to the stack.
+func genAddr(node *Node) {
+	if node.kind == ND_LVAR {
+		offset := (node.name - 'a' + 1) * 8
+		fmt.Printf("  lea rax, [rbp-%d]\n", offset)
+		fmt.Printf("  push rax\n")
+		return
+	}
+
+	reportError("not an lvalue")
+}
+
+func load() {
+	fmt.Printf("  pop rax\n")
+	fmt.Printf("  mov rax, [rax]\n")
+	fmt.Printf("  push rax\n")
+}
+
+func store() {
+	fmt.Printf("  pop rdi\n")
+	fmt.Printf("  pop rax\n")
+	fmt.Printf("  mov [rax], rdi\n")
+	fmt.Printf("  push rdi\n")
+}
+
+// Generate code for a given node.
 func gen(node *Node) {
 	switch node.kind {
 	case ND_NUM:
@@ -11,10 +37,19 @@ func gen(node *Node) {
 		gen(node.lhs)
 		fmt.Printf("  add rsp, 8\n")
 		return
+	case ND_LVAR:
+		genAddr(node)
+		load()
+		return
+	case ND_ASSIGN:
+		genAddr(node.lhs)
+		gen(node.rhs)
+		store()
+		return
 	case ND_RETURN:
 		gen(node.lhs)
 		fmt.Printf("  pop rax\n")
-		fmt.Printf("  ret\n")
+		fmt.Printf("  jmp .Lreturn\n")
 		return
 	}
 
@@ -60,9 +95,18 @@ func codegen(node *Node) {
 	fmt.Printf(".global main\n")
 	fmt.Printf("main:\n")
 
+	// Prologue
+	fmt.Printf("  push rbp\n")
+	fmt.Printf("  mov rbp, rsp\n")
+	fmt.Printf("  sub rsp, 208\n")
+
 	for n := node; n != nil; n = n.next {
 		gen(n)
 	}
 
+	// Epilogue
+	fmt.Printf(".Lreturn:\n")
+	fmt.Printf("  mov rsp, rbp\n")
+	fmt.Printf("  pop rbp\n")
 	fmt.Printf("  ret\n")
 }

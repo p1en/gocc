@@ -12,8 +12,10 @@ const (
 	ND_NE                        // !=
 	ND_LT                        // <
 	ND_LE                        // <=
+	ND_ASSIGN                    // =
 	ND_RETURN                    // "return"
 	ND_EXPR_STMT                 // Expression statement
+	ND_LVAR                      // Local variable
 	ND_NUM                       // Integer
 )
 
@@ -23,6 +25,7 @@ type Node struct {
 	next *Node    // Next node
 	lhs  *Node    // Left-hand side
 	rhs  *Node    // Right-hand side
+	name byte     // Used if kind == ND_LVAR
 	val  int      // Used if kind == ND_NUM
 }
 
@@ -36,6 +39,10 @@ func newUnary(kind NodeKind, expr *Node) *Node {
 
 func newNum(val int) *Node {
 	return &Node{kind: ND_NUM, val: val}
+}
+
+func newLvar(name byte) *Node {
+	return &Node{kind: ND_LVAR, name: name}
 }
 
 // program = stmt*
@@ -68,9 +75,20 @@ func stmt() *Node {
 	return node
 }
 
-// expr = equality
+// expr = assign
 func expr() *Node {
-	return equality()
+	return assign()
+}
+
+// assign = equality ("=" assign)?
+func assign() *Node {
+	node := equality()
+
+	if consume("=") {
+		node = newBinary(ND_ASSIGN, node, assign())
+	}
+
+	return node
 }
 
 // equality = relational ("==" relational | "!=" relational)*
@@ -152,13 +170,18 @@ func unary() *Node {
 	return primary()
 }
 
-// primary = "(" expr ")" | num
+// primary = "(" expr ")" | ident | num
 func primary() *Node {
 	if consume("(") {
 		node := expr()
 		expect(")")
 
 		return node
+	}
+
+	tok := consumeIdent()
+	if tok != nil {
+		return newLvar(tok.str[0])
 	}
 
 	return newNum(expectNumber())
