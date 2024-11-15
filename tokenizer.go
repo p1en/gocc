@@ -151,37 +151,43 @@ func tokenize() *Token {
 
 		// Keyword
 		if startswith(p, "return") && !isAlnum(p[6]) {
-			cur = newToken(TK_RESERVED, cur, p[:6], 6)
+			cur = newToken(TK_RESERVED, cur, p, 6)
 			p = p[6:]
 			continue
 		}
 
 		// Multi-letter punctuator
 		if startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=") {
-			cur = newToken(TK_RESERVED, cur, p[:2], 2)
+			cur = newToken(TK_RESERVED, cur, p, 2)
 			p = p[2:]
 			continue
 		}
 
 		// Single-letter punctuator
 		if strings.ContainsRune("+-*/()<>;=", rune(c)) {
-			cur = newToken(TK_RESERVED, cur, p[:1], 1)
+			cur = newToken(TK_RESERVED, cur, p, 1)
 			p = p[1:]
 			continue
 		}
 
 		// Identifier
 		if unicode.IsLetter(rune(c)) {
-			cur = newToken(TK_IDENT, cur, p[:1], 1)
+			q := p
+			pl := len(p)
 			p = p[1:]
+			for isAlnum(p[0]) && len(p) > 0 {
+				p = p[1:]
+			}
+			cur = newToken(TK_IDENT, cur, q, pl-len(p))
 			continue
 		}
 
 		// Integer literal
 		if unicode.IsDigit(rune(c)) {
+			cur = newToken(TK_NUM, cur, p, 0)
 			n, cnt := getNum(p)
-			cur = newToken(TK_NUM, cur, p[:cnt], cnt)
 			cur.val = n
+			cur.len = cnt
 			p = p[cnt:]
 			continue
 		}

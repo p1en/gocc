@@ -1,6 +1,12 @@
 package main
 
-// AST node kind
+type Variable struct {
+	next   *Variable
+	name   string // Variable name
+	offset int    // Offset from RBP
+}
+
+// AST node
 type NodeKind int
 
 const (
@@ -15,18 +21,37 @@ const (
 	ND_ASSIGN                    // =
 	ND_RETURN                    // "return"
 	ND_EXPR_STMT                 // Expression statement
-	ND_LVAR                      // Local variable
+	ND_VAR                       // Variable
 	ND_NUM                       // Integer
 )
 
 // AST node type
 type Node struct {
-	kind NodeKind // Node kind
-	next *Node    // Next node
-	lhs  *Node    // Left-hand side
-	rhs  *Node    // Right-hand side
-	name byte     // Used if kind == ND_LVAR
-	val  int      // Used if kind == ND_NUM
+	kind     NodeKind  // Node kind
+	next     *Node     // Next node
+	lhs      *Node     // Left-hand side
+	rhs      *Node     // Right-hand side
+	variable *Variable // Used if kind == ND_VAR
+	val      int       // Used if kind == ND_NUM
+}
+
+type Program struct {
+	node      *Node
+	locals    *Variable
+	stackSize int
+}
+
+var locals *Variable
+
+// Find a local variable by name.
+func findVar(tok *Token) *Variable {
+	for v := locals; v != nil; v = v.next {
+		if len(v.name) == tok.len && tok.str[:tok.len] == v.name {
+			return v
+		}
+	}
+
+	return nil
 }
 
 func newBinary(kind NodeKind, lhs *Node, rhs *Node) *Node {
@@ -41,12 +66,19 @@ func newNum(val int) *Node {
 	return &Node{kind: ND_NUM, val: val}
 }
 
-func newLvar(name byte) *Node {
-	return &Node{kind: ND_LVAR, name: name}
+func newVar(variable *Variable) *Node {
+	return &Node{kind: ND_VAR, variable: variable}
+}
+
+func pushVar(name string) *Variable {
+	variable := &Variable{next: locals, name: name}
+	locals = variable
+
+	return variable
 }
 
 // program = stmt*
-func program() *Node {
+func program() *Program {
 	head := &Node{}
 	cur := head
 
@@ -55,7 +87,7 @@ func program() *Node {
 		cur = cur.next
 	}
 
-	return head.next
+	return &Program{node: head.next, locals: locals}
 }
 
 // stmt = "return" expr ";"
@@ -181,7 +213,11 @@ func primary() *Node {
 
 	tok := consumeIdent()
 	if tok != nil {
-		return newLvar(tok.str[0])
+		variable := findVar(tok)
+		if variable == nil {
+			variable = pushVar(tok.str[:tok.len])
+		}
+		return newVar(variable)
 	}
 
 	return newNum(expectNumber())

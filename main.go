@@ -12,8 +12,16 @@ func main() {
 	// Tokenize and parse.
 	userInput = os.Args[1]
 	token = tokenize()
-	node := program()
+	prog := program()
+
+	// Assign offsets to local variables.
+	offset := 0
+	for v := prog.locals; v != nil; v = v.next {
+		offset += 8
+		v.offset = offset
+	}
+	prog.stackSize = offset
 
 	// Traverse the AST to emit assembly.
-	codegen(node)
+	codegen(prog)
 }

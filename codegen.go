@@ -4,9 +4,8 @@ import "fmt"
 
 // Pushes the given node's address to the stack.
 func genAddr(node *Node) {
-	if node.kind == ND_LVAR {
-		offset := (node.name - 'a' + 1) * 8
-		fmt.Printf("  lea rax, [rbp-%d]\n", offset)
+	if node.kind == ND_VAR {
+		fmt.Printf("  lea rax, [rbp-%d]\n", node.variable.offset)
 		fmt.Printf("  push rax\n")
 		return
 	}
@@ -37,7 +36,7 @@ func gen(node *Node) {
 		gen(node.lhs)
 		fmt.Printf("  add rsp, 8\n")
 		return
-	case ND_LVAR:
+	case ND_VAR:
 		genAddr(node)
 		load()
 		return
@@ -90,7 +89,7 @@ func gen(node *Node) {
 	fmt.Printf("  push rax\n")
 }
 
-func codegen(node *Node) {
+func codegen(prog *Program) {
 	fmt.Printf(".intel_syntax noprefix\n")
 	fmt.Printf(".global main\n")
 	fmt.Printf("main:\n")
@@ -98,10 +97,11 @@ func codegen(node *Node) {
 	// Prologue
 	fmt.Printf("  push rbp\n")
 	fmt.Printf("  mov rbp, rsp\n")
-	fmt.Printf("  sub rsp, 208\n")
+	fmt.Printf("  sub rsp, %d\n", prog.stackSize)
 
-	for n := node; n != nil; n = n.next {
-		gen(n)
+	// Emit code
+	for node := prog.node; node != nil; node = node.next {
+		gen(node)
 	}
 
 	// Epilogue
