@@ -27,6 +27,7 @@ type Token struct {
 	next *Token    // Next token
 	val  int       // If kind is TK_NUM, its value
 	str  string    // Token string
+	len  int       // Token length
 }
 
 // Input program
@@ -72,8 +73,8 @@ func reportErrorAt(loc string, format string, a ...any) {
 }
 
 // Consumes the current token if it matches `op`.
-func consume(op byte) bool {
-	if token.kind != TK_RESERVED || token.str[0] != op {
+func consume(op string) bool {
+	if token.kind != TK_RESERVED || len(op) != token.len || token.str[:token.len] != op {
 		return false
 	}
 
@@ -83,9 +84,9 @@ func consume(op byte) bool {
 }
 
 // Ensure that the current token is `op`.
-func expect(op byte) {
-	if token.kind != TK_RESERVED || token.str[0] != op {
-		reportErrorAt(token.str, "expected '%c'", op)
+func expect(op string) {
+	if token.kind != TK_RESERVED || len(op) != token.len || token.str[:token.len] != op {
+		reportErrorAt(token.str, "expected '%s'", op)
 	}
 
 	token = token.next
@@ -108,11 +109,15 @@ func atEOF() bool {
 }
 
 // Create a new token and add it as the next token of `cur`.
-func newToken(kind TokenKind, cur *Token, str string) *Token {
-	tok := &Token{kind: kind, str: str}
+func newToken(kind TokenKind, cur *Token, str string, len int) *Token {
+	tok := &Token{kind: kind, str: str, len: len}
 	cur.next = tok
 
 	return tok
+}
+
+func startswith(p string, q string) bool {
+	return strings.HasPrefix(p, q)
 }
 
 // Tokenize `user_input` and returns new tokens.
@@ -130,9 +135,16 @@ func tokenize() *Token {
 			continue
 		}
 
-		// Punctuator
-		if strings.ContainsRune("+-*/()", rune(c)) {
-			cur = newToken(TK_RESERVED, cur, p[:1])
+		// Multi-letter punctuator
+		if startswith(p, "==") || startswith(p, "!=") || startswith(p, "<=") || startswith(p, ">=") {
+			cur = newToken(TK_RESERVED, cur, p[:2], 2)
+			p = p[2:]
+			continue
+		}
+
+		// Single-letter punctuator
+		if strings.ContainsRune("+-*/()<>", rune(c)) {
+			cur = newToken(TK_RESERVED, cur, p[:1], 1)
 			p = p[1:]
 			continue
 		}
@@ -140,7 +152,7 @@ func tokenize() *Token {
 		// Integer literal
 		if unicode.IsDigit(rune(c)) {
 			n, cnt := getNum(p)
-			cur = newToken(TK_NUM, cur, p[:cnt])
+			cur = newToken(TK_NUM, cur, p[:cnt], cnt)
 			cur.val = n
 			p = p[cnt:]
 			continue
@@ -149,7 +161,7 @@ func tokenize() *Token {
 		reportErrorAt(p, "invalid token")
 	}
 
-	newToken(TK_EOF, cur, "")
+	newToken(TK_EOF, cur, "", 0)
 
 	return head.next
 }
@@ -166,6 +178,10 @@ const (
 	ND_SUB                 // -
 	ND_MUL                 // *
 	ND_DIV                 // /
+	ND_EQ                  // ==
+	ND_NE                  // !=
+	ND_LT                  // <
+	ND_LE                  // <=
 	ND_NUM                 // Integer
 )
 
@@ -185,14 +201,53 @@ func newNum(val int) *Node {
 	return &Node{kind: ND_NUM, val: val}
 }
 
-// expr = mul ("+" mul | "-" mul)*
+// expr = equality
 func expr() *Node {
+	return equality()
+}
+
+// equality = relational ("==" relational | "!=" relational)*
+func equality() *Node {
+	node := relational()
+
+	for {
+		if consume("==") {
+			node = newBinary(ND_EQ, node, relational())
+		} else if consume("!=") {
+			node = newBinary(ND_NE, node, relational())
+		} else {
+			return node
+		}
+	}
+}
+
+// relational = add ("<" add | "<=" add | ">" add | ">=" add)*
+func relational() *Node {
+	node := add()
+
+	for {
+		if consume("<") {
+			node = newBinary(ND_LT, node, add())
+		} else if consume("<=") {
+			node = newBinary(ND_LE, node, add())
+		} else if consume(">") {
+			node = newBinary(ND_LT, add(), node)
+		} else if consume(">=") {
+			node = newBinary(ND_LE, add(), node)
+		} else {
+			return node
+		}
+	}
+}
+
+// add = mul ("+" mul | "-" mul)*
+func add() *Node {
 	node := mul()
 
 	for {
-		if consume('+') {
+		if consume("+") {
 			node = newBinary(ND_ADD, node, mul())
-		} else if consume('-') {
+		} else if consume("-") {
 			node = newBinary(ND_SUB, node, mul())
 		} else {
 			return node
@@ -205,9 +260,9 @@ func mul() *Node {
 	node := unary()
 
 	for {
-		if consume('*') {
+		if consume("*") {
 			node = newBinary(ND_MUL, node, unary())
-		} else if consume('/') {
+		} else if consume("/") {
 			node = newBinary(ND_DIV, node, unary())
 		} else {
 			return node
@@ -215,14 +270,13 @@ func mul() *Node {
 	}
 }
 
-// unary = ("+" | "-")? unary
-//       | primary
+// unary = ("+" | "-")? unary | primary
 func unary() *Node {
-	if consume('+') {
+	if consume("+") {
 		return unary()
 	}
 
-	if consume('-') {
+	if consume("-") {
 		return newBinary(ND_SUB, newNum(0), unary())
 	}
 
@@ -231,9 +285,9 @@ func unary() *Node {
 
 // primary = "(" expr ")" | num
 func primary() *Node {
-	if consume('(') {
+	if consume("(") {
 		node := expr()
-		expect(')')
+		expect(")")
 
 		return node
 	}
@@ -267,6 +321,22 @@ func gen(node *Node) {
 	case ND_DIV:
 		fmt.Printf("  cqo\n")
 		fmt.Printf("  idiv rdi\n")
+	case ND_EQ:
+		fmt.Printf("  cmp rax, rdi\n")
+		fmt.Printf("  sete al\n")
+		fmt.Printf("  movzb rax, al\n")
+	case ND_NE:
+		fmt.Printf("  cmp rax, rdi\n")
+		fmt.Printf("  setne al\n")
+		fmt.Printf("  movzb rax, al\n")
+	case ND_LT:
+		fmt.Printf("  cmp rax, rdi\n")
+		fmt.Printf("  setl al\n")
+		fmt.Printf("  movzb rax, al\n")
+	case ND_LE:
+		fmt.Printf("  cmp rax, rdi\n")
+		fmt.Printf("  setle al\n")
+		fmt.Printf("  movzb rax, al\n")
 	}
 
 	fmt.Printf("  push rax\n")
