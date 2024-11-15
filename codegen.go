@@ -3,8 +3,14 @@ package main
 import "fmt"
 
 func gen(node *Node) {
-	if node.kind == ND_NUM {
+	switch node.kind {
+	case ND_NUM:
 		fmt.Printf("  push %d\n", node.val)
+		return
+	case ND_RETURN:
+		gen(node.lhs)
+		fmt.Printf("  pop rax\n")
+		fmt.Printf("  ret\n")
 		return
 	}
 

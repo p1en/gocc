@@ -4,15 +4,16 @@ package main
 type NodeKind int
 
 const (
-	ND_ADD NodeKind = iota // +
-	ND_SUB                 // -
-	ND_MUL                 // *
-	ND_DIV                 // /
-	ND_EQ                  // ==
-	ND_NE                  // !=
-	ND_LT                  // <
-	ND_LE                  // <=
-	ND_NUM                 // Integer
+	ND_ADD    NodeKind = iota // +
+	ND_SUB                    // -
+	ND_MUL                    // *
+	ND_DIV                    // /
+	ND_EQ                     // ==
+	ND_NE                     // !=
+	ND_LT                     // <
+	ND_LE                     // <=
+	ND_RETURN                 // "return"
+	ND_NUM                    // Integer
 )
 
 // AST node type
@@ -26,6 +27,10 @@ type Node struct {
 
 func newBinary(kind NodeKind, lhs *Node, rhs *Node) *Node {
 	return &Node{kind: kind, lhs: lhs, rhs: rhs}
+}
+
+func newUnary(kind NodeKind, expr *Node) *Node {
+	return &Node{kind: kind, lhs: expr}
 }
 
 func newNum(val int) *Node {
@@ -45,8 +50,17 @@ func program() *Node {
 	return head.next
 }
 
-// stmt = expr ";"
+// stmt = "return" expr ";"
+//
+//	| expr ";"
 func stmt() *Node {
+	if consume("return") {
+		node := newUnary(ND_RETURN, expr())
+		expect(";")
+
+		return node
+	}
+
 	node := expr()
 	expect(";")
 
@@ -122,7 +136,9 @@ func mul() *Node {
 	}
 }
 
-// unary = ("+" | "-")? unary | primary
+// unary = ("+" | "-")? unary
+//
+//	| primary
 func unary() *Node {
 	if consume("+") {
 		return unary()

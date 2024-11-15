@@ -113,6 +113,14 @@ func startswith(p string, q string) bool {
 	return strings.HasPrefix(p, q)
 }
 
+func isAlpha(c byte) bool {
+	return unicode.IsLetter(rune(c)) || c == '_'
+}
+
+func isAlnum(c byte) bool {
+	return isAlpha(c) || unicode.IsDigit(rune(c))
+}
+
 // Tokenize `userInput` and returns new tokens.
 func tokenize() *Token {
 	p := userInput
@@ -125,6 +133,13 @@ func tokenize() *Token {
 		// Skip whitespace characters.
 		if c == ' ' {
 			p = p[1:]
+			continue
+		}
+
+		// Keyword
+		if startswith(p, "return") && !isAlnum(p[6]) {
+			cur = newToken(TK_RESERVED, cur, p[:6], 6)
+			p = p[6:]
 			continue
 		}
 
