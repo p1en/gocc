@@ -12,7 +12,7 @@ func main() {
 	// Tokenize and parse.
 	userInput = os.Args[1]
 	token = tokenize()
-	node := expr()
+	node := program()
 
 	// Traverse the AST to emit assembly.
 	codegen(node)

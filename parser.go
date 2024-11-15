@@ -18,6 +18,7 @@ const (
 // AST node type
 type Node struct {
 	kind NodeKind // Node kind
+	next *Node    // Next node
 	lhs  *Node    // Left-hand side
 	rhs  *Node    // Right-hand side
 	val  int      // Used if kind == ND_NUM
@@ -29,6 +30,27 @@ func newBinary(kind NodeKind, lhs *Node, rhs *Node) *Node {
 
 func newNum(val int) *Node {
 	return &Node{kind: ND_NUM, val: val}
+}
+
+// program = stmt*
+func program() *Node {
+	head := &Node{}
+	cur := head
+
+	for !atEOF() {
+		cur.next = stmt()
+		cur = cur.next
+	}
+
+	return head.next
+}
+
+// stmt = expr ";"
+func stmt() *Node {
+	node := expr()
+	expect(";")
+
+	return node
 }
 
 // expr = equality

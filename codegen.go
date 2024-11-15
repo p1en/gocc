@@ -50,9 +50,10 @@ func codegen(node *Node) {
 	fmt.Printf(".global main\n")
 	fmt.Printf("main:\n")
 
-	gen(node)
+	for n := node; n != nil; n = n.next {
+		gen(n)
+		fmt.Printf("  pop rax\n")
+	}
 
-	// A result must be at the top of the stack, so pop it to RAX to make it a program exit code.
-	fmt.Printf("  pop rax\n")
 	fmt.Printf("  ret\n")
 }
