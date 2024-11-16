@@ -22,6 +22,7 @@ const (
 	ND_RETURN                    // "return"
 	ND_IF                        // "if"
 	ND_WHILE                     // "while"
+	ND_FOR                       // "for"
 	ND_EXPR_STMT                 // Expression statement
 	ND_VAR                       // Variable
 	ND_NUM                       // Integer
@@ -34,10 +35,12 @@ type Node struct {
 	lhs  *Node    // Left-hand side
 	rhs  *Node    // Right-hand side
 
-	// "if" or "while" statement
+	// "if, "while" or "for" statement
 	cond *Node
 	then *Node
 	els  *Node
+	init *Node
+	inc  *Node
 
 	variable *Variable // Used if kind == ND_VAR
 	val      int       // Used if kind == ND_NUM
@@ -60,6 +63,10 @@ func findVar(tok *Token) *Variable {
 	}
 
 	return nil
+}
+
+func newNode(kind NodeKind) *Node {
+	return &Node{kind: kind}
 }
 
 func newBinary(kind NodeKind, lhs *Node, rhs *Node) *Node {
@@ -106,6 +113,7 @@ func readExprStmt() *Node {
 //
 //	| "if" "(" expr ")" stmt ("else" stmt)?
 //	| "while" "(" expr ")" stmt
+//	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
 //	| expr ";"
 func stmt() *Node {
 	if consume("return") {
@@ -116,7 +124,7 @@ func stmt() *Node {
 	}
 
 	if consume("if") {
-		node := &Node{kind: ND_IF}
+		node := newNode(ND_IF)
 		expect("(")
 		node.cond = expr()
 		expect(")")
@@ -130,10 +138,30 @@ func stmt() *Node {
 	}
 
 	if consume("while") {
-		node := &Node{kind: ND_WHILE}
+		node := newNode(ND_WHILE)
 		expect("(")
 		node.cond = expr()
 		expect(")")
+		node.then = stmt()
+
+		return node
+	}
+
+	if consume("for") {
+		node := newNode(ND_FOR)
+		expect("(")
+		if !consume(";") {
+			node.init = readExprStmt()
+			expect(";")
+		}
+		if !consume(";") {
+			node.cond = expr()
+			expect(";")
+		}
+		if !consume(")") {
+			node.inc = readExprStmt()
+			expect(")")
+		}
 		node.then = stmt()
 
 		return node
