@@ -110,6 +110,18 @@ func expectNumber() int {
 	return val
 }
 
+// Ensure that the current token is TK_IDENT.
+func expectIdent() string {
+	if token.kind != TK_IDENT {
+		reportErrorAt(token.str, "expected an identifier")
+	}
+
+	s := token.str[:token.len]
+	token = token.next
+
+	return s
+}
+
 func atEOF() bool {
 	return token.kind == TK_EOF
 }

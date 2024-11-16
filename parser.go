@@ -55,7 +55,9 @@ type Node struct {
 	val      int       // Used if kind == ND_NUM
 }
 
-type Program struct {
+type Function struct {
+	next      *Function
+	name      string
 	node      *Node
 	locals    *Variable
 	stackSize int
@@ -101,17 +103,34 @@ func pushVar(name string) *Variable {
 	return variable
 }
 
-// program = stmt*
-func program() *Program {
-	head := &Node{}
+// program = function*
+func program() *Function {
+	head := &Function{}
 	cur := head
 
 	for !atEOF() {
+		cur.next = function()
+		cur = cur.next
+	}
+
+	return head.next
+}
+
+// function = ident "(" ")" "{" stmt* "}"
+func function() *Function {
+	name := expectIdent()
+	expect("(")
+	expect(")")
+	expect("{")
+
+	head := &Node{}
+	cur := head
+	for !consume("}") {
 		cur.next = stmt()
 		cur = cur.next
 	}
 
-	return &Program{node: head.next, locals: locals}
+	return &Function{name: name, node: head.next, locals: locals}
 }
 
 func readExprStmt() *Node {

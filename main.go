@@ -15,12 +15,14 @@ func main() {
 	prog := program()
 
 	// Assign offsets to local variables.
-	offset := 0
-	for v := prog.locals; v != nil; v = v.next {
-		offset += 8
-		v.offset = offset
+	for fn := prog; fn != nil; fn = fn.next {
+		offset := 0
+		for v := prog.locals; v != nil; v = v.next {
+			offset += 8
+			v.offset = offset
+		}
+		fn.stackSize = offset
 	}
-	prog.stackSize = offset
 
 	// Traverse the AST to emit assembly.
 	codegen(prog)

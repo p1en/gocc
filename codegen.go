@@ -2,8 +2,10 @@ package main
 
 import "fmt"
 
-var labelseq int
 var argreg = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
+
+var labelseq int
+var funcname string
 
 // Pushes the given node's address to the stack.
 func genAddr(node *Node) {
@@ -141,7 +143,7 @@ func gen(node *Node) {
 	case ND_RETURN:
 		gen(node.lhs)
 		fmt.Printf("  pop rax\n")
-		fmt.Printf("  jmp .Lreturn\n")
+		fmt.Printf("  jmp .Lreturn.%s\n", funcname)
 		return
 	}
 
@@ -182,24 +184,29 @@ func gen(node *Node) {
 	fmt.Printf("  push rax\n")
 }
 
-func codegen(prog *Program) {
+func codegen(prog *Function) {
 	fmt.Printf(".intel_syntax noprefix\n")
-	fmt.Printf(".global main\n")
-	fmt.Printf("main:\n")
 
-	// Prologue
-	fmt.Printf("  push rbp\n")
-	fmt.Printf("  mov rbp, rsp\n")
-	fmt.Printf("  sub rsp, %d\n", prog.stackSize)
+	for fn := prog; fn != nil; fn = fn.next {
+		fmt.Printf(".global %s\n", fn.name)
+		fmt.Printf("%s:\n", fn.name)
 
-	// Emit code
-	for node := prog.node; node != nil; node = node.next {
-		gen(node)
+		funcname = fn.name
+
+		// Prologue
+		fmt.Printf("  push rbp\n")
+		fmt.Printf("  mov rbp, rsp\n")
+		fmt.Printf("  sub rsp, %d\n", fn.stackSize)
+
+		// Emit code
+		for node := fn.node; node != nil; node = node.next {
+			gen(node)
+		}
+
+		// Epilogue
+		fmt.Printf(".Lreturn.%s:\n", funcname)
+		fmt.Printf("  mov rsp, rbp\n")
+		fmt.Printf("  pop rbp\n")
+		fmt.Printf("  ret\n")
 	}
-
-	// Epilogue
-	fmt.Printf(".Lreturn:\n")
-	fmt.Printf("  mov rsp, rbp\n")
-	fmt.Printf("  pop rbp\n")
-	fmt.Printf("  ret\n")
 }
