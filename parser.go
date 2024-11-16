@@ -1,9 +1,13 @@
 package main
 
 type Variable struct {
-	next   *Variable
 	name   string // Variable name
 	offset int    // Offset from RBP
+}
+
+type VariableList struct {
+	next     *VariableList
+	variable *Variable
 }
 
 // AST node
@@ -56,18 +60,21 @@ type Node struct {
 }
 
 type Function struct {
-	next      *Function
-	name      string
+	next   *Function
+	name   string
+	params *VariableList
+
 	node      *Node
-	locals    *Variable
+	locals    *VariableList
 	stackSize int
 }
 
-var locals *Variable
+var locals *VariableList
 
 // Find a local variable by name.
 func findVar(tok *Token) *Variable {
-	for v := locals; v != nil; v = v.next {
+	for vl := locals; vl != nil; vl = vl.next {
+		v := vl.variable
 		if len(v.name) == tok.len && tok.str[:tok.len] == v.name {
 			return v
 		}
@@ -97,10 +104,11 @@ func newVar(variable *Variable) *Node {
 }
 
 func pushVar(name string) *Variable {
-	variable := &Variable{next: locals, name: name}
-	locals = variable
+	v := &Variable{name: name}
+	vl := &VariableList{variable: v, next: locals}
+	locals = vl
 
-	return variable
+	return v
 }
 
 // program = function*
@@ -116,11 +124,29 @@ func program() *Function {
 	return head.next
 }
 
-// function = ident "(" ")" "{" stmt* "}"
+func readFuncParams() *VariableList {
+	if consume(")") {
+		return nil
+	}
+
+	head := &VariableList{variable: pushVar(expectIdent())}
+	cur := head
+
+	for !consume(")") {
+		expect(",")
+		cur.next = &VariableList{variable: pushVar(expectIdent())}
+		cur = cur.next
+	}
+
+	return head
+}
+
+// function = ident "(" params? ")" "{" stmt* "}"
+// params   = ident ("," ident)*
 func function() *Function {
-	name := expectIdent()
+	fn := &Function{name: expectIdent()}
 	expect("(")
-	expect(")")
+	fn.params = readFuncParams()
 	expect("{")
 
 	head := &Node{}
@@ -130,7 +156,10 @@ func function() *Function {
 		cur = cur.next
 	}
 
-	return &Function{name: name, node: head.next, locals: locals}
+	fn.node = head.next
+	fn.locals = locals
+
+	return fn
 }
 
 func readExprStmt() *Node {

@@ -17,9 +17,9 @@ func main() {
 	// Assign offsets to local variables.
 	for fn := prog; fn != nil; fn = fn.next {
 		offset := 0
-		for v := prog.locals; v != nil; v = v.next {
+		for vl := fn.locals; vl != nil; vl = vl.next {
 			offset += 8
-			v.offset = offset
+			vl.variable.offset = offset
 		}
 		fn.stackSize = offset
 	}
