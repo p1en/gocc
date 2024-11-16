@@ -3,6 +3,7 @@ package main
 import "fmt"
 
 var labelseq int
+var argreg = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
 
 // Pushes the given node's address to the stack.
 func genAddr(node *Node) {
@@ -107,8 +108,19 @@ func gen(node *Node) {
 		}
 		return
 	case ND_FUNCALL:
+		nargs := 0
+		for arg := node.args; arg != nil; arg = arg.next {
+			gen(arg)
+			nargs++
+		}
+
+		for i := nargs - 1; i >= 0; i-- {
+			fmt.Printf("  pop %s\n", argreg[i])
+		}
+
 		fmt.Printf("  call %s\n", node.funcname)
 		fmt.Printf("  push rax\n")
+
 		return
 	case ND_RETURN:
 		gen(node.lhs)

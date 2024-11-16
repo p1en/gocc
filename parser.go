@@ -49,6 +49,7 @@ type Node struct {
 
 	// Function call
 	funcname string
+	args     *Node
 
 	variable *Variable // Used if kind == ND_VAR
 	val      int       // Used if kind == ND_NUM
@@ -289,8 +290,24 @@ func unary() *Node {
 	return primary()
 }
 
-// primary = "(" expr ")" | ident args? | num
-// args = "(" ")"
+// func-args = "(" (assign ("," assign)*)? ")"
+func funcArgs() *Node {
+	if consume(")") {
+		return nil
+	}
+
+	head := assign()
+	cur := head
+	for consume(",") {
+		cur.next = assign()
+		cur = cur.next
+	}
+	expect(")")
+
+	return head
+}
+
+// primary = "(" expr ")" | ident func-args? | num
 func primary() *Node {
 	if consume("(") {
 		node := expr()
@@ -302,8 +319,7 @@ func primary() *Node {
 	tok := consumeIdent()
 	if tok != nil {
 		if consume("(") {
-			expect(")")
-			return &Node{kind: ND_FUNCALL, funcname: tok.str[:tok.len]}
+			return &Node{kind: ND_FUNCALL, funcname: tok.str[:tok.len], args: funcArgs()}
 		}
 
 		variable := findVar(tok)

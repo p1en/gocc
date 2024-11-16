@@ -180,7 +180,7 @@ func tokenize() *Token {
 		}
 
 		// Single-letter punctuator
-		if strings.ContainsRune("+-*/()<>;={}", rune(c)) {
+		if strings.ContainsRune("+-*/()<>;={},", rune(c)) {
 			cur = newToken(TK_RESERVED, cur, p, 1)
 			p = p[1:]
 			continue
