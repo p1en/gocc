@@ -23,6 +23,7 @@ const (
 	ND_IF                        // "if"
 	ND_WHILE                     // "while"
 	ND_FOR                       // "for"
+	ND_BLOCK                     // { ... }
 	ND_EXPR_STMT                 // Expression statement
 	ND_VAR                       // Variable
 	ND_NUM                       // Integer
@@ -41,6 +42,9 @@ type Node struct {
 	els  *Node
 	init *Node
 	inc  *Node
+
+	// Block
+	body *Node
 
 	variable *Variable // Used if kind == ND_VAR
 	val      int       // Used if kind == ND_NUM
@@ -114,6 +118,7 @@ func readExprStmt() *Node {
 //	| "if" "(" expr ")" stmt ("else" stmt)?
 //	| "while" "(" expr ")" stmt
 //	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
+//	| "{" stmt* "}"
 //	| expr ";"
 func stmt() *Node {
 	if consume("return") {
@@ -163,6 +168,21 @@ func stmt() *Node {
 			expect(")")
 		}
 		node.then = stmt()
+
+		return node
+	}
+
+	if consume("{") {
+		head := &Node{}
+		cur := head
+
+		for !consume("}") {
+			cur.next = stmt()
+			cur = cur.next
+		}
+
+		node := newNode(ND_BLOCK)
+		node.body = head.next
 
 		return node
 	}
