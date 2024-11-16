@@ -24,6 +24,7 @@ const (
 	ND_WHILE                     // "while"
 	ND_FOR                       // "for"
 	ND_BLOCK                     // { ... }
+	ND_FUNCALL                   // Function call
 	ND_EXPR_STMT                 // Expression statement
 	ND_VAR                       // Variable
 	ND_NUM                       // Integer
@@ -45,6 +46,9 @@ type Node struct {
 
 	// Block
 	body *Node
+
+	// Function call
+	funcname string
 
 	variable *Variable // Used if kind == ND_VAR
 	val      int       // Used if kind == ND_NUM
@@ -181,10 +185,7 @@ func stmt() *Node {
 			cur = cur.next
 		}
 
-		node := newNode(ND_BLOCK)
-		node.body = head.next
-
-		return node
+		return &Node{kind: ND_BLOCK, body: head.next}
 	}
 
 	node := readExprStmt()
@@ -288,7 +289,8 @@ func unary() *Node {
 	return primary()
 }
 
-// primary = "(" expr ")" | ident | num
+// primary = "(" expr ")" | ident args? | num
+// args = "(" ")"
 func primary() *Node {
 	if consume("(") {
 		node := expr()
@@ -299,6 +301,11 @@ func primary() *Node {
 
 	tok := consumeIdent()
 	if tok != nil {
+		if consume("(") {
+			expect(")")
+			return &Node{kind: ND_FUNCALL, funcname: tok.str[:tok.len]}
+		}
+
 		variable := findVar(tok)
 		if variable == nil {
 			variable = pushVar(tok.str[:tok.len])
