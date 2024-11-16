@@ -23,6 +23,8 @@ const (
 	ND_LT                        // <
 	ND_LE                        // <=
 	ND_ASSIGN                    // =
+	ND_ADDR                      // unary &
+	ND_DEREF                     // unary *
 	ND_RETURN                    // "return"
 	ND_IF                        // "if"
 	ND_WHILE                     // "while"
@@ -336,7 +338,7 @@ func mul() *Node {
 	}
 }
 
-// unary = ("+" | "-")? unary
+// unary = ("+" | "-" | "*" | "&")? unary
 //
 //	| primary
 func unary() *Node {
@@ -345,9 +347,14 @@ func unary() *Node {
 	if consume("+") != nil {
 		return unary()
 	}
-
 	if tok = consume("-"); tok != nil {
 		return newBinary(ND_SUB, newNum(0, tok), unary(), tok)
+	}
+	if tok = consume("&"); tok != nil {
+		return newUnary(ND_ADDR, unary(), tok)
+	}
+	if tok = consume("*"); tok != nil {
+		return newUnary(ND_DEREF, unary(), tok)
 	}
 
 	return primary()
