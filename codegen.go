@@ -15,7 +15,7 @@ func genAddr(node *Node) {
 		return
 	}
 
-	reportError("not an lvalue")
+	errorTok(node.tok, "not an lvalue")
 }
 
 func load() {

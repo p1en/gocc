@@ -56,7 +56,7 @@ func reportError(format string, a ...any) {
 }
 
 // Reports an error location and exit.
-func reportErrorAt(loc string, format string, a ...any) {
+func verrorAt(loc string, format string, a ...any) {
 	pos := len(userInput) - len(loc)
 	fmt.Fprintf(os.Stderr, "%s\n", userInput)
 	fmt.Fprintf(os.Stderr, "%*s", pos, " ")
@@ -66,15 +66,32 @@ func reportErrorAt(loc string, format string, a ...any) {
 	os.Exit(1)
 }
 
-// Consumes the current token if it matches `op`.
-func consume(op string) bool {
-	if token.kind != TK_RESERVED || len(op) != token.len || token.str[:token.len] != op {
-		return false
+// Reports an error location and exit.
+func errorAt(loc string, format string, a ...any) {
+	verrorAt(loc, fmt.Sprintf(format, a...))
+}
+
+// Reports an error location and exit.
+func errorTok(tok *Token, format string, a ...any) {
+	if tok != nil {
+		verrorAt(tok.str, format, a...)
 	}
 
+	fmt.Fprintf(os.Stderr, format, a...)
+	fmt.Fprintln(os.Stderr)
+	os.Exit(1)
+}
+
+// Consumes the current token if it matches `op`.
+func consume(op string) *Token {
+	if token.kind != TK_RESERVED || len(op) != token.len || token.str[:token.len] != op {
+		return nil
+	}
+
+	t := token
 	token = token.next
 
-	return true
+	return t
 }
 
 // Consumes the current token if it is an identifier.
@@ -92,7 +109,7 @@ func consumeIdent() *Token {
 // Ensure that the current token is `op`.
 func expect(op string) {
 	if token.kind != TK_RESERVED || len(op) != token.len || token.str[:token.len] != op {
-		reportErrorAt(token.str, "expected '%s'", op)
+		errorTok(token, "expected '%s'", op)
 	}
 
 	token = token.next
@@ -101,7 +118,7 @@ func expect(op string) {
 // Ensure that the current token is TK_NUM.
 func expectNumber() int {
 	if token.kind != TK_NUM {
-		reportErrorAt(token.str, "expected a number")
+		errorTok(token, "expected a number")
 	}
 
 	val := token.val
@@ -113,7 +130,7 @@ func expectNumber() int {
 // Ensure that the current token is TK_IDENT.
 func expectIdent() string {
 	if token.kind != TK_IDENT {
-		reportErrorAt(token.str, "expected an identifier")
+		errorTok(token, "expected an identifier")
 	}
 
 	s := token.str[:token.len]
@@ -220,7 +237,7 @@ func tokenize() *Token {
 			continue
 		}
 
-		reportErrorAt(p, "invalid token")
+		errorAt(p, "invalid token")
 	}
 
 	newToken(TK_EOF, cur, "", 0)
