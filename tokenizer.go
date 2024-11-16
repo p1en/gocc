@@ -136,7 +136,7 @@ func isAlnum(c byte) bool {
 
 func startsWithReserved(p string) string {
 	// Keyword
-	kw := []string{"return", "if", "else"}
+	kw := []string{"return", "if", "else", "while"}
 	for _, v := range kw {
 		l := len(v)
 		if startswith(p, v) && !isAlnum(p[l]) {

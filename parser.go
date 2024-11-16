@@ -21,6 +21,7 @@ const (
 	ND_ASSIGN                    // =
 	ND_RETURN                    // "return"
 	ND_IF                        // "if"
+	ND_WHILE                     // "while"
 	ND_EXPR_STMT                 // Expression statement
 	ND_VAR                       // Variable
 	ND_NUM                       // Integer
@@ -33,7 +34,7 @@ type Node struct {
 	lhs  *Node    // Left-hand side
 	rhs  *Node    // Right-hand side
 
-	// "if" statement
+	// "if" or "while" statement
 	cond *Node
 	then *Node
 	els  *Node
@@ -104,6 +105,7 @@ func readExprStmt() *Node {
 // stmt = "return" expr ";"
 //
 //	| "if" "(" expr ")" stmt ("else" stmt)?
+//	| "while" "(" expr ")" stmt
 //	| expr ";"
 func stmt() *Node {
 	if consume("return") {
@@ -123,6 +125,16 @@ func stmt() *Node {
 		if consume("else") {
 			node.els = stmt()
 		}
+
+		return node
+	}
+
+	if consume("while") {
+		node := &Node{kind: ND_WHILE}
+		expect("(")
+		node.cond = expr()
+		expect(")")
+		node.then = stmt()
 
 		return node
 	}
