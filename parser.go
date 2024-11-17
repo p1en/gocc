@@ -1,5 +1,7 @@
 package main
 
+import "strconv"
+
 // Variable
 type Variable struct {
 	name    string // Variable name
@@ -8,6 +10,10 @@ type Variable struct {
 
 	// Local variable
 	offset int // Offset from RBP
+
+	// Global variable
+	contents string
+	contLen  int
 }
 
 type VariableList struct {
@@ -88,6 +94,7 @@ type Program struct {
 
 var locals *VariableList
 var globals *VariableList
+var labelcnt int
 
 // Find a local variable by name.
 func findVar(tok *Token) *Variable {
@@ -141,6 +148,13 @@ func pushVar(name string, ty *Type, isLocal bool) *Variable {
 	}
 
 	return v
+}
+
+func newLabel() string {
+	label := ".L.data." + strconv.Itoa(labelcnt)
+	labelcnt++
+
+	return label
 }
 
 func isFunction() bool {
@@ -515,7 +529,8 @@ func funcArgs() *Node {
 	return head
 }
 
-// primary = "(" expr ")" | "sizeof" unary | ident func-args? | num
+// primary = "(" expr ")" | "sizeof" unary | ident func-args? | str | num
+// args = "(" ident ("," ident)* ")"
 func primary() *Node {
 	var tok *Token
 
@@ -547,6 +562,18 @@ func primary() *Node {
 	}
 
 	tok = token
+
+	if tok.kind == TK_STR {
+		token = token.next
+
+		ty := arrayOf(charType(), int(tok.contLen))
+		v := pushVar(newLabel(), ty, false)
+		v.contents = tok.contents
+		v.contLen = int(tok.contLen)
+
+		return newVar(v, tok)
+	}
+
 	if tok.kind != TK_NUM {
 		errorTok(tok, "expected expression")
 	}

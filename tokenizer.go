@@ -14,6 +14,7 @@ type TokenKind int
 const (
 	TK_RESERVED TokenKind = iota // Keywords or punctuators
 	TK_IDENT                     // Identifiers
+	TK_STR                       // String literals
 	TK_NUM                       // Integer literals
 	TK_EOF                       // End-of-file markers
 )
@@ -25,6 +26,9 @@ type Token struct {
 	val  int       // If kind is TK_NUM, its value
 	str  string    // Token string
 	len  int       // Token length
+
+	contents string // String literal contents including terminating '\0'
+	contLen  byte   // String literal length
 }
 
 var userInput string
@@ -233,6 +237,26 @@ func tokenize() *Token {
 				p = p[1:]
 			}
 			cur = newToken(TK_IDENT, cur, q, pl-len(p))
+			continue
+		}
+
+		// String literal
+		if c == '"' {
+			q := p
+			p = p[1:]
+			for p[0] != '"' && len(p) > 0 {
+				p = p[1:]
+			}
+			if len(p) == 0 {
+				errorAt(q, "unclosed string literal")
+			}
+
+			cur = newToken(TK_STR, cur, q, len(q)-len(p))
+			cur.contents = q[1:len(q)-len(p)] + "\x00"
+			cur.contLen = byte(len(q) - len(p))
+
+			p = p[1:]
+
 			continue
 		}
 

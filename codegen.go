@@ -238,7 +238,15 @@ func emitData(prog *Program) {
 	for vl := prog.globals; vl != nil; vl = vl.next {
 		v := vl.variable
 		fmt.Printf("%s:\n", v.name)
-		fmt.Printf("  .zero %d\n", sizeOf(v.ty))
+
+		if v.contents == "" {
+			fmt.Printf("  .zero %d\n", sizeOf(v.ty))
+			continue
+		}
+
+		for i := 0; i < v.contLen; i++ {
+			fmt.Printf("  .byte %d\n", v.contents[i])
+		}
 	}
 }
 
