@@ -2,7 +2,8 @@ package main
 
 import "fmt"
 
-var argreg = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
+var argreg1 = []string{"dil", "sil", "dl", "cl", "r8b", "r9b"}
+var argreg8 = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
 
 var labelseq int
 var funcname string
@@ -34,16 +35,28 @@ func genLval(node *Node) {
 	genAddr(node)
 }
 
-func load() {
+func load(ty *Type) {
 	fmt.Printf("  pop rax\n")
-	fmt.Printf("  mov rax, [rax]\n")
+
+	if sizeOf(ty) == 1 {
+		fmt.Printf("  movsx rax, byte ptr [rax]\n")
+	} else {
+		fmt.Printf("  mov rax, [rax]\n")
+	}
+
 	fmt.Printf("  push rax\n")
 }
 
-func store() {
+func store(ty *Type) {
 	fmt.Printf("  pop rdi\n")
 	fmt.Printf("  pop rax\n")
-	fmt.Printf("  mov [rax], rdi\n")
+
+	if sizeOf(ty) == 1 {
+		fmt.Printf("  mov [rax], dil\n")
+	} else {
+		fmt.Printf("  mov [rax], rdi\n")
+	}
+
 	fmt.Printf("  push rdi\n")
 }
 
@@ -62,13 +75,13 @@ func gen(node *Node) {
 	case ND_VAR:
 		genAddr(node)
 		if node.ty.kind != TY_ARRAY {
-			load()
+			load(node.ty)
 		}
 		return
 	case ND_ASSIGN:
 		genLval(node.lhs)
 		gen(node.rhs)
-		store()
+		store(node.ty)
 		return
 	case ND_ADDR:
 		genAddr(node.lhs)
@@ -76,7 +89,7 @@ func gen(node *Node) {
 	case ND_DEREF:
 		gen(node.lhs)
 		if node.ty.kind != TY_ARRAY {
-			load()
+			load(node.ty)
 		}
 		return
 	case ND_IF:
@@ -146,7 +159,7 @@ func gen(node *Node) {
 		}
 
 		for i := nargs - 1; i >= 0; i-- {
-			fmt.Printf("  pop %s\n", argreg[i])
+			fmt.Printf("  pop %s\n", argreg8[i])
 		}
 
 		// We need to align RSP to a 16 byte boundary before calling a function because it is an ABI requirement.
@@ -229,6 +242,18 @@ func emitData(prog *Program) {
 	}
 }
 
+func loadArg(v *Variable, idx int) {
+	sz := sizeOf(v.ty)
+	if sz == 1 {
+		fmt.Printf("  mov [rbp-%d], %s\n", v.offset, argreg1[idx])
+	} else {
+		if sz != 8 {
+			panic("sz != 8")
+		}
+		fmt.Printf("  mov [rbp-%d], %s\n", v.offset, argreg8[idx])
+	}
+}
+
 func emitText(prog *Program) {
 	fmt.Printf(".text\n")
 
@@ -246,8 +271,7 @@ func emitText(prog *Program) {
 		// Push arguments to the stack
 		i := 0
 		for vl := fn.params; vl != nil; vl = vl.next {
-			v := vl.variable
-			fmt.Printf("  mov [rbp-%d], %s\n", v.offset, argreg[i])
+			loadArg(vl.variable, i)
 			i++
 		}
 

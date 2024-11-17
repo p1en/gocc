@@ -170,10 +170,17 @@ func program() *Program {
 	return &Program{globals: globals, fns: head.next}
 }
 
-// basetype = "int" "*"*
+// basetype = ("char" | "int") "*"*
 func baseType() *Type {
-	expect("int")
-	ty := intType()
+	var ty *Type
+
+	if consume("char") != nil {
+		ty = charType()
+	} else {
+		expect("int")
+		ty = intType()
+	}
+
 	for consume("*") != nil {
 		ty = pointerTo(ty)
 	}
@@ -279,6 +286,10 @@ func readExprStmt() *Node {
 	return newUnary(ND_EXPR_STMT, expr(), tok)
 }
 
+func isTypename() bool {
+	return peek("char") != nil || peek("int") != nil
+}
+
 // stmt = "return" expr ";"
 //
 //	| "if" "(" expr ")" stmt ("else" stmt)?
@@ -356,7 +367,7 @@ func stmt() *Node {
 		return node
 	}
 
-	if tok = peek("int"); tok != nil {
+	if isTypename() {
 		return declaration()
 	}
 

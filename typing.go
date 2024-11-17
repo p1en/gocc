@@ -3,7 +3,8 @@ package main
 type TypeKind int
 
 const (
-	TY_INT TypeKind = iota
+	TY_CHAR TypeKind = iota
+	TY_INT
 	TY_PTR
 	TY_ARRAY
 )
@@ -14,27 +15,45 @@ type Type struct {
 	arraySize int
 }
 
+func newType(kind TypeKind) *Type {
+	return &Type{kind: kind}
+}
+
+func charType() *Type {
+	return newType(TY_CHAR)
+}
+
 func intType() *Type {
-	return &Type{kind: TY_INT}
+	return newType(TY_INT)
 }
 
 func pointerTo(base *Type) *Type {
-	return &Type{kind: TY_PTR, base: base}
+	ty := newType(TY_PTR)
+	ty.base = base
+
+	return ty
 }
 
 func arrayOf(base *Type, size int) *Type {
-	return &Type{kind: TY_ARRAY, base: base, arraySize: size}
+	ty := newType(TY_ARRAY)
+	ty.base = base
+	ty.arraySize = size
+
+	return ty
 }
 
 func sizeOf(ty *Type) int {
-	if ty.kind == TY_INT || ty.kind == TY_PTR {
+	switch ty.kind {
+	case TY_CHAR:
+		return 1
+	case TY_INT, TY_PTR:
 		return 8
+	default:
+		if ty.kind != TY_ARRAY {
+			panic("ty.kind != TY_ARRAY")
+		}
+		return sizeOf(ty.base) * ty.arraySize
 	}
-	if ty.kind != TY_ARRAY {
-		panic("ty.kind != TY_ARRAY")
-	}
-
-	return sizeOf(ty.base) * ty.arraySize
 }
 
 func visit(node *Node) {

@@ -4,6 +4,10 @@ import (
 	"os"
 )
 
+func alignTo(n int, align int) int {
+	return (n + align - 1) & ^(align - 1)
+}
+
 func main() {
 	if len(os.Args) != 2 {
 		reportError("%s: invalid number of arguments", os.Args[0])
@@ -23,7 +27,7 @@ func main() {
 			offset += sizeOf(v.ty)
 			v.offset = offset
 		}
-		fn.stackSize = offset
+		fn.stackSize = alignTo(offset, 8)
 	}
 
 	// Traverse the AST to emit assembly.
