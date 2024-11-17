@@ -13,6 +13,7 @@ func main() {
 	userInput = os.Args[1]
 	token = tokenize()
 	prog := program()
+	addType(prog)
 
 	// Assign offsets to local variables.
 	for fn := prog; fn != nil; fn = fn.next {
