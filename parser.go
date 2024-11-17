@@ -405,7 +405,7 @@ func mul() *Node {
 
 // unary = ("+" | "-" | "*" | "&")? unary
 //
-//	| primary
+//	| postfix
 func unary() *Node {
 	var tok *Token
 
@@ -422,7 +422,21 @@ func unary() *Node {
 		return newUnary(ND_DEREF, unary(), tok)
 	}
 
-	return primary()
+	return postfix()
+}
+
+// postfix = primary ("[" expr "]")*
+func postfix() *Node {
+	node := primary()
+
+	for tok := consume("["); tok != nil; tok = consume("[") {
+		// x[y] is short for *(x+y)
+		exp := newBinary(ND_ADD, node, expr(), tok)
+		expect("]")
+		node = newUnary(ND_DEREF, exp, tok)
+	}
+
+	return node
 }
 
 // func-args = "(" (assign ("," assign)*)? ")"
