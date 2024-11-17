@@ -97,6 +97,12 @@ func visit(node *Node) {
 		}
 		node.ty = node.lhs.ty.base
 		return
+	case ND_SIZEOF:
+		node.kind = ND_NUM
+		node.ty = intType()
+		node.val = sizeOf(node.lhs.ty)
+		node.lhs = nil
+		return
 	}
 }
 

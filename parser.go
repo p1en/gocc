@@ -30,6 +30,7 @@ const (
 	ND_IF                        // "if"
 	ND_WHILE                     // "while"
 	ND_FOR                       // "for"
+	ND_SIZEOF                    // "sizeof"
 	ND_BLOCK                     // { ... }
 	ND_FUNCALL                   // Function call
 	ND_EXPR_STMT                 // Expression statement
@@ -456,8 +457,10 @@ func funcArgs() *Node {
 	return head
 }
 
-// primary = "(" expr ")" | ident func-args? | num
+// primary = "(" expr ")" | "sizeof" unary | ident func-args? | num
 func primary() *Node {
+	var tok *Token
+
 	if consume("(") != nil {
 		node := expr()
 		expect(")")
@@ -465,8 +468,11 @@ func primary() *Node {
 		return node
 	}
 
-	tok := consumeIdent()
-	if tok != nil {
+	if tok = consume("sizeof"); tok != nil {
+		return newUnary(ND_SIZEOF, unary(), tok)
+	}
+
+	if tok = consumeIdent(); tok != nil {
 		if consume("(") != nil {
 			node := newNode(ND_FUNCALL, tok)
 			node.funcname = tok.str[:tok.len]
