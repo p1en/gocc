@@ -82,9 +82,18 @@ func errorTok(tok *Token, format string, a ...any) {
 	os.Exit(1)
 }
 
-// Consumes the current token if it matches `op`.
-func consume(op string) *Token {
-	if token.kind != TK_RESERVED || len(op) != token.len || token.str[:token.len] != op {
+// Returns true if the current token matches a given string.
+func peek(s string) *Token {
+	if token.kind != TK_RESERVED || len(s) != token.len || token.str[:token.len] != s {
+		return nil
+	}
+
+	return token
+}
+
+// Consumes the current token if it matches a given string.
+func consume(s string) *Token {
+	if peek(s) == nil {
 		return nil
 	}
 
@@ -106,10 +115,10 @@ func consumeIdent() *Token {
 	return t
 }
 
-// Ensure that the current token is `op`.
-func expect(op string) {
-	if token.kind != TK_RESERVED || len(op) != token.len || token.str[:token.len] != op {
-		errorTok(token, "expected '%s'", op)
+// Ensure that the current token is a given string.
+func expect(s string) {
+	if peek(s) == nil {
+		errorTok(token, "expected \"%s\"", s)
 	}
 
 	token = token.next
@@ -165,7 +174,7 @@ func isAlnum(c byte) bool {
 
 func startsWithReserved(p string) string {
 	// Keyword
-	kw := []string{"return", "if", "else", "while", "for"}
+	kw := []string{"return", "if", "else", "while", "for", "int"}
 	for _, v := range kw {
 		l := len(v)
 		if startswith(p, v) && !isAlnum(p[l]) {

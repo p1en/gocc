@@ -38,6 +38,8 @@ func store() {
 // Generate code for a given node.
 func gen(node *Node) {
 	switch node.kind {
+	case ND_NULL:
+		return
 	case ND_NUM:
 		fmt.Printf("  push %d\n", node.val)
 		return

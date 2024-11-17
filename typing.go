@@ -41,8 +41,11 @@ func visit(node *Node) {
 	}
 
 	switch node.kind {
-	case ND_MUL, ND_DIV, ND_EQ, ND_NE, ND_LT, ND_LE, ND_VAR, ND_FUNCALL, ND_NUM:
+	case ND_MUL, ND_DIV, ND_EQ, ND_NE, ND_LT, ND_LE, ND_FUNCALL, ND_NUM:
 		node.ty = intType()
+		return
+	case ND_VAR:
+		node.ty = node.variable.ty
 		return
 	case ND_ADD:
 		if node.rhs.ty.kind == TY_PTR {
@@ -68,11 +71,10 @@ func visit(node *Node) {
 		node.ty = pointerTo(node.lhs.ty)
 		return
 	case ND_DEREF:
-		if node.lhs.ty.kind == TY_PTR {
-			node.ty = node.lhs.ty.base
-		} else {
-			node.ty = intType()
+		if node.lhs.ty.kind != TY_PTR {
+			errorTok(node.tok, "invalid pointer dereference")
 		}
+		node.ty = node.lhs.ty.base
 		return
 	}
 }

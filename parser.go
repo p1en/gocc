@@ -2,6 +2,7 @@ package main
 
 type Variable struct {
 	name   string // Variable name
+	ty     *Type  // Type
 	offset int    // Offset from RBP
 }
 
@@ -34,6 +35,7 @@ const (
 	ND_EXPR_STMT                 // Expression statement
 	ND_VAR                       // Variable
 	ND_NUM                       // Integer
+	ND_NULL                      // Empty statement
 )
 
 // AST node type
@@ -108,8 +110,8 @@ func newVar(variable *Variable, tok *Token) *Node {
 	return &Node{kind: ND_VAR, variable: variable, tok: tok}
 }
 
-func pushVar(name string) *Variable {
-	v := &Variable{name: name}
+func pushVar(name string, ty *Type) *Variable {
+	v := &Variable{name: name, ty: ty}
 	vl := &VariableList{variable: v, next: locals}
 	locals = vl
 
@@ -118,8 +120,8 @@ func pushVar(name string) *Variable {
 
 // program = function*
 func program() *Function {
-	head := &Function{}
-	cur := head
+	head := Function{}
+	cur := &head
 
 	for !atEOF() {
 		cur.next = function()
@@ -129,27 +131,51 @@ func program() *Function {
 	return head.next
 }
 
+// basetype = "int" "*"*
+func baseType() *Type {
+	expect("int")
+	ty := intType()
+	for consume("*") != nil {
+		ty = pointerTo(ty)
+	}
+
+	return ty
+}
+
+func readFuncParam() *VariableList {
+	vl := &VariableList{}
+	ty := baseType()
+	vl.variable = pushVar(expectIdent(), ty)
+
+	return vl
+}
+
 func readFuncParams() *VariableList {
 	if consume(")") != nil {
 		return nil
 	}
 
-	head := &VariableList{variable: pushVar(expectIdent())}
+	head := readFuncParam()
 	cur := head
 
 	for consume(")") == nil {
 		expect(",")
-		cur.next = &VariableList{variable: pushVar(expectIdent())}
+		cur.next = readFuncParam()
 		cur = cur.next
 	}
 
 	return head
 }
 
-// function = ident "(" params? ")" "{" stmt* "}"
-// params   = ident ("," ident)*
+// function = basetype ident "(" params? ")" "{" stmt* "}"
+// params   = param ("," param)*
+// param    = basetype ident
 func function() *Function {
-	fn := &Function{name: expectIdent()}
+	locals = nil
+
+	fn := &Function{}
+	baseType()
+	fn.name = expectIdent()
 	expect("(")
 	fn.params = readFuncParams()
 	expect("{")
@@ -167,6 +193,25 @@ func function() *Function {
 	return fn
 }
 
+// declaration = basetype ident ("=" expr) ";"
+func declaration() *Node {
+	tok := token
+	ty := baseType()
+	v := pushVar(expectIdent(), ty)
+
+	if consume(";") != nil {
+		return newNode(ND_NULL, tok)
+	}
+
+	expect("=")
+	lhs := newVar(v, tok)
+	rhs := expr()
+	expect(";")
+	node := newBinary(ND_ASSIGN, lhs, rhs, tok)
+
+	return newUnary(ND_EXPR_STMT, node, tok)
+}
+
 func readExprStmt() *Node {
 	tok := token
 	return newUnary(ND_EXPR_STMT, expr(), tok)
@@ -178,6 +223,7 @@ func readExprStmt() *Node {
 //	| "while" "(" expr ")" stmt
 //	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
 //	| "{" stmt* "}"
+//	| declaration
 //	| expr ";"
 func stmt() *Node {
 	var tok *Token
@@ -246,6 +292,10 @@ func stmt() *Node {
 		node.body = head.next
 
 		return node
+	}
+
+	if tok = peek("int"); tok != nil {
+		return declaration()
 	}
 
 	node := readExprStmt()
@@ -399,7 +449,7 @@ func primary() *Node {
 
 		variable := findVar(tok)
 		if variable == nil {
-			variable = pushVar(tok.str[:tok.len])
+			errorTok(tok, "undefined variable")
 		}
 		return newVar(variable, tok)
 	}
