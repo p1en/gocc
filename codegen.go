@@ -22,6 +22,13 @@ func genAddr(node *Node) {
 	errorTok(node.tok, "not an lvalue")
 }
 
+func genLval(node *Node) {
+	if node.ty.kind == TY_ARRAY {
+		errorTok(node.tok, "not an lvalue")
+	}
+	genAddr(node)
+}
+
 func load() {
 	fmt.Printf("  pop rax\n")
 	fmt.Printf("  mov rax, [rax]\n")
@@ -49,10 +56,12 @@ func gen(node *Node) {
 		return
 	case ND_VAR:
 		genAddr(node)
-		load()
+		if node.ty.kind != TY_ARRAY {
+			load()
+		}
 		return
 	case ND_ASSIGN:
-		genAddr(node.lhs)
+		genLval(node.lhs)
 		gen(node.rhs)
 		store()
 		return
@@ -61,7 +70,9 @@ func gen(node *Node) {
 		return
 	case ND_DEREF:
 		gen(node.lhs)
-		load()
+		if node.ty.kind != TY_ARRAY {
+			load()
+		}
 		return
 	case ND_IF:
 		seq := labelseq
@@ -168,13 +179,13 @@ func gen(node *Node) {
 
 	switch node.kind {
 	case ND_ADD:
-		if node.ty.kind == TY_PTR {
-			fmt.Printf("  imul rdi, 8\n")
+		if node.ty.base != nil {
+			fmt.Printf("  imul rdi, %d\n", sizeOf(node.ty.base))
 		}
 		fmt.Printf("  add rax, rdi\n")
 	case ND_SUB:
-		if node.ty.kind == TY_PTR {
-			fmt.Printf("  imul rdi, 8\n")
+		if node.ty.base != nil {
+			fmt.Printf("  imul rdi, %d\n", sizeOf(node.ty.base))
 		}
 		fmt.Printf("  sub rax, rdi\n")
 	case ND_MUL:

@@ -5,11 +5,13 @@ type TypeKind int
 const (
 	TY_INT TypeKind = iota
 	TY_PTR
+	TY_ARRAY
 )
 
 type Type struct {
-	kind TypeKind
-	base *Type
+	kind      TypeKind
+	base      *Type
+	arraySize int
 }
 
 func intType() *Type {
@@ -18,6 +20,21 @@ func intType() *Type {
 
 func pointerTo(base *Type) *Type {
 	return &Type{kind: TY_PTR, base: base}
+}
+
+func arrayOf(base *Type, size int) *Type {
+	return &Type{kind: TY_ARRAY, base: base, arraySize: size}
+}
+
+func sizeOf(ty *Type) int {
+	if ty.kind == TY_INT || ty.kind == TY_PTR {
+		return 8
+	}
+	if ty.kind != TY_ARRAY {
+		panic("ty.kind != TY_ARRAY")
+	}
+
+	return sizeOf(ty.base) * ty.arraySize
 }
 
 func visit(node *Node) {
@@ -48,18 +65,18 @@ func visit(node *Node) {
 		node.ty = node.variable.ty
 		return
 	case ND_ADD:
-		if node.rhs.ty.kind == TY_PTR {
+		if node.rhs.ty.base != nil {
 			tmp := node.lhs
 			node.lhs = node.rhs
 			node.rhs = tmp
 		}
-		if node.rhs.ty.kind == TY_PTR {
+		if node.rhs.ty.base != nil {
 			errorTok(node.tok, "invalid pointer arithmetic operands")
 		}
 		node.ty = node.lhs.ty
 		return
 	case ND_SUB:
-		if node.rhs.ty.kind == TY_PTR {
+		if node.rhs.ty.base != nil {
 			errorTok(node.tok, "invalid pointer arithmetic operands")
 		}
 		node.ty = node.lhs.ty
@@ -68,10 +85,14 @@ func visit(node *Node) {
 		node.ty = node.lhs.ty
 		return
 	case ND_ADDR:
-		node.ty = pointerTo(node.lhs.ty)
+		if node.lhs.ty.kind == TY_ARRAY {
+			node.ty = pointerTo(node.lhs.ty.base)
+		} else {
+			node.ty = pointerTo(node.lhs.ty)
+		}
 		return
 	case ND_DEREF:
-		if node.lhs.ty.kind != TY_PTR {
+		if node.lhs.ty.base == nil {
 			errorTok(node.tok, "invalid pointer dereference")
 		}
 		node.ty = node.lhs.ty.base

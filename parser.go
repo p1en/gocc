@@ -142,12 +142,24 @@ func baseType() *Type {
 	return ty
 }
 
-func readFuncParam() *VariableList {
-	vl := &VariableList{}
-	ty := baseType()
-	vl.variable = pushVar(expectIdent(), ty)
+func readTypeSuffix(base *Type) *Type {
+	if consume("[") == nil {
+		return base
+	}
 
-	return vl
+	sz := expectNumber()
+	expect("]")
+	base = readTypeSuffix(base)
+
+	return arrayOf(base, sz)
+}
+
+func readFuncParam() *VariableList {
+	ty := baseType()
+	name := expectIdent()
+	ty = readTypeSuffix(ty)
+
+	return &VariableList{variable: pushVar(name, ty)}
 }
 
 func readFuncParams() *VariableList {
@@ -193,11 +205,13 @@ func function() *Function {
 	return fn
 }
 
-// declaration = basetype ident ("=" expr) ";"
+// declaration = basetype ident ("[" num "]")* ("=" expr) ";"
 func declaration() *Node {
 	tok := token
 	ty := baseType()
-	v := pushVar(expectIdent(), ty)
+	name := expectIdent()
+	ty = readTypeSuffix(ty)
+	v := pushVar(name, ty)
 
 	if consume(";") != nil {
 		return newNode(ND_NULL, tok)

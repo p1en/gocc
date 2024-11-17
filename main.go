@@ -19,8 +19,9 @@ func main() {
 	for fn := prog; fn != nil; fn = fn.next {
 		offset := 0
 		for vl := fn.locals; vl != nil; vl = vl.next {
-			offset += 8
-			vl.variable.offset = offset
+			v := vl.variable
+			offset += sizeOf(v.ty)
+			v.offset = offset
 		}
 		fn.stackSize = offset
 	}
