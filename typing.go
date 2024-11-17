@@ -106,8 +106,8 @@ func visit(node *Node) {
 	}
 }
 
-func addType(prog *Function) {
-	for fn := prog; fn != nil; fn = fn.next {
+func addType(prog *Program) {
+	for fn := prog.fns; fn != nil; fn = fn.next {
 		for node := fn.node; node != nil; node = node.next {
 			visit(node)
 		}

@@ -11,8 +11,13 @@ var funcname string
 func genAddr(node *Node) {
 	switch node.kind {
 	case ND_VAR:
-		fmt.Printf("  lea rax, [rbp-%d]\n", node.variable.offset)
-		fmt.Printf("  push rax\n")
+		v := node.variable
+		if v.isLocal {
+			fmt.Printf("  lea rax, [rbp-%d]\n", v.offset)
+			fmt.Printf("  push rax\n")
+		} else {
+			fmt.Printf("  push offset %s\n", v.name)
+		}
 		return
 	case ND_DEREF:
 		gen(node.lhs)
@@ -214,10 +219,20 @@ func gen(node *Node) {
 	fmt.Printf("  push rax\n")
 }
 
-func codegen(prog *Function) {
-	fmt.Printf(".intel_syntax noprefix\n")
+func emitData(prog *Program) {
+	fmt.Printf(".data\n")
 
-	for fn := prog; fn != nil; fn = fn.next {
+	for vl := prog.globals; vl != nil; vl = vl.next {
+		v := vl.variable
+		fmt.Printf("%s:\n", v.name)
+		fmt.Printf("  .zero %d\n", sizeOf(v.ty))
+	}
+}
+
+func emitText(prog *Program) {
+	fmt.Printf(".text\n")
+
+	for fn := prog.fns; fn != nil; fn = fn.next {
 		fmt.Printf(".global %s\n", fn.name)
 		fmt.Printf("%s:\n", fn.name)
 
@@ -247,4 +262,10 @@ func codegen(prog *Function) {
 		fmt.Printf("  pop rbp\n")
 		fmt.Printf("  ret\n")
 	}
+}
+
+func codegen(prog *Program) {
+	fmt.Printf(".intel_syntax noprefix\n")
+	emitData(prog)
+	emitText(prog)
 }

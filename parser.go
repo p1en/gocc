@@ -1,9 +1,13 @@
 package main
 
+// Variable
 type Variable struct {
-	name   string // Variable name
-	ty     *Type  // Type
-	offset int    // Offset from RBP
+	name    string // Variable name
+	ty      *Type  // Type
+	isLocal bool   // local or global
+
+	// Local variable
+	offset int // Offset from RBP
 }
 
 type VariableList struct {
@@ -77,11 +81,24 @@ type Function struct {
 	stackSize int
 }
 
+type Program struct {
+	globals *VariableList
+	fns     *Function
+}
+
 var locals *VariableList
+var globals *VariableList
 
 // Find a local variable by name.
 func findVar(tok *Token) *Variable {
 	for vl := locals; vl != nil; vl = vl.next {
+		v := vl.variable
+		if len(v.name) == tok.len && tok.str[:tok.len] == v.name {
+			return v
+		}
+	}
+
+	for vl := globals; vl != nil; vl = vl.next {
 		v := vl.variable
 		if len(v.name) == tok.len && tok.str[:tok.len] == v.name {
 			return v
@@ -111,25 +128,46 @@ func newVar(variable *Variable, tok *Token) *Node {
 	return &Node{kind: ND_VAR, variable: variable, tok: tok}
 }
 
-func pushVar(name string, ty *Type) *Variable {
-	v := &Variable{name: name, ty: ty}
-	vl := &VariableList{variable: v, next: locals}
-	locals = vl
+func pushVar(name string, ty *Type, isLocal bool) *Variable {
+	v := &Variable{name: name, ty: ty, isLocal: isLocal}
+	vl := &VariableList{variable: v}
+
+	if isLocal {
+		vl.next = locals
+		locals = vl
+	} else {
+		vl.next = globals
+		globals = vl
+	}
 
 	return v
 }
 
-// program = function*
-func program() *Function {
+func isFunction() bool {
+	tok := token
+	baseType()
+	isFunc := (consumeIdent() != nil) && (consume("(") != nil)
+	token = tok
+
+	return isFunc
+}
+
+// program = (global-var | function)*
+func program() *Program {
 	head := Function{}
 	cur := &head
+	globals = nil
 
 	for !atEOF() {
-		cur.next = function()
-		cur = cur.next
+		if isFunction() {
+			cur.next = function()
+			cur = cur.next
+		} else {
+			globalVar()
+		}
 	}
 
-	return head.next
+	return &Program{globals: globals, fns: head.next}
 }
 
 // basetype = "int" "*"*
@@ -160,7 +198,7 @@ func readFuncParam() *VariableList {
 	name := expectIdent()
 	ty = readTypeSuffix(ty)
 
-	return &VariableList{variable: pushVar(name, ty)}
+	return &VariableList{variable: pushVar(name, ty, true)}
 }
 
 func readFuncParams() *VariableList {
@@ -206,13 +244,22 @@ func function() *Function {
 	return fn
 }
 
+// global-var = basetype ident ("[" num "]")* ";"
+func globalVar() {
+	ty := baseType()
+	name := expectIdent()
+	ty = readTypeSuffix(ty)
+	expect(";")
+	pushVar(name, ty, false)
+}
+
 // declaration = basetype ident ("[" num "]")* ("=" expr) ";"
 func declaration() *Node {
 	tok := token
 	ty := baseType()
 	name := expectIdent()
 	ty = readTypeSuffix(ty)
-	v := pushVar(name, ty)
+	v := pushVar(name, ty, true)
 
 	if consume(";") != nil {
 		return newNode(ND_NULL, tok)

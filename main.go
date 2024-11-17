@@ -16,7 +16,7 @@ func main() {
 	addType(prog)
 
 	// Assign offsets to local variables.
-	for fn := prog; fn != nil; fn = fn.next {
+	for fn := prog.fns; fn != nil; fn = fn.next {
 		offset := 0
 		for vl := fn.locals; vl != nil; vl = vl.next {
 			v := vl.variable
