@@ -214,7 +214,7 @@ func startsWithReserved(p string) string {
 	}
 
 	// Multi-letter punctuator
-	ops := []string{"==", "!=", "<=", ">="}
+	ops := []string{"==", "!=", "<=", ">=", "->"}
 	for _, v := range ops {
 		if startswith(p, v) {
 			return v
