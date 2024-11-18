@@ -44,6 +44,7 @@ const (
 	ND_BLOCK                     // { ... }
 	ND_FUNCALL                   // Function call
 	ND_EXPR_STMT                 // Expression statement
+	ND_STMT_EXPR                 // Statement expression
 	ND_VAR                       // Variable
 	ND_NUM                       // Integer
 	ND_NULL                      // Empty statement
@@ -66,7 +67,7 @@ type Node struct {
 	init *Node
 	inc  *Node
 
-	// Block
+	// Block or statement expression
 	body *Node
 
 	// Function call
@@ -512,6 +513,28 @@ func postfix() *Node {
 	return node
 }
 
+// stmt-expr = "(" "{" stmt stmt* "}" ")"
+//
+// Statement expression is a GNU C extension.
+func stmtExpr(tok *Token) *Node {
+	node := newNode(ND_STMT_EXPR, tok)
+	node.body = stmt()
+	cur := node.body
+
+	for consume("}") == nil {
+		cur.next = stmt()
+		cur = cur.next
+	}
+	expect(")")
+
+	if cur.kind != ND_EXPR_STMT {
+		errorTok(cur.tok, "stmt expr returning void is not supported")
+	}
+	*cur = *cur.lhs
+
+	return node
+}
+
 // func-args = "(" (assign ("," assign)*)? ")"
 func funcArgs() *Node {
 	if consume(")") != nil {
@@ -529,12 +552,21 @@ func funcArgs() *Node {
 	return head
 }
 
-// primary = "(" expr ")" | "sizeof" unary | ident func-args? | str | num
-// args = "(" ident ("," ident)* ")"
+// primary = "(" "{" stmt-expr-tail
+//
+//	| "(" expr ")"
+//	| "sizeof" unary
+//	| ident func-args?
+//	| str
+//	| num
 func primary() *Node {
 	var tok *Token
 
-	if consume("(") != nil {
+	if tok = consume("("); tok != nil {
+		if consume("{") != nil {
+			return stmtExpr(tok)
+		}
+
 		node := expr()
 		expect(")")
 

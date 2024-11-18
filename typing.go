@@ -122,6 +122,13 @@ func visit(node *Node) {
 		node.val = sizeOf(node.lhs.ty)
 		node.lhs = nil
 		return
+	case ND_STMT_EXPR:
+		last := node.body
+		for last.next != nil {
+			last = last.next
+		}
+		node.ty = last.ty
+		return
 	}
 }
 

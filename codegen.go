@@ -146,7 +146,7 @@ func gen(node *Node) {
 		fmt.Printf("  jmp .Lbegin%d\n", seq)
 		fmt.Printf(".Lend%d:\n", seq)
 		return
-	case ND_BLOCK:
+	case ND_BLOCK, ND_STMT_EXPR:
 		for n := node.body; n != nil; n = n.next {
 			gen(n)
 		}
