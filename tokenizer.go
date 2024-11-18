@@ -197,6 +197,65 @@ func startsWithReserved(p string) string {
 	return ""
 }
 
+func getEscapeChar(c byte) byte {
+	switch c {
+	case 'a':
+		return '\a'
+	case 'b':
+		return '\b'
+	case 't':
+		return '\t'
+	case 'n':
+		return '\n'
+	case 'v':
+		return '\v'
+	case 'f':
+		return '\f'
+	case 'r':
+		return '\r'
+	case 'e':
+		return 27
+	case '0':
+		return 0
+	default:
+		return c
+	}
+}
+
+func readStringLiteral(cur *Token, start string) *Token {
+	p := start[1:]
+	buf := make([]byte, 0)
+	l := 0
+
+	for {
+		c := p[0]
+		if l == 1024 {
+			errorAt(p, "string literal too large")
+		}
+		if c == 0 {
+			errorAt(p, "unclosed string literal")
+		}
+		if c == '"' {
+			break
+		}
+
+		if c == '\\' {
+			p = p[1:]
+			buf = append(buf, getEscapeChar(p[0]))
+			p = p[1:]
+		} else {
+			buf = append(buf, c)
+			p = p[1:]
+		}
+	}
+
+	tok := newToken(TK_STR, cur, start, len(start)-len(p)+1)
+	tok.contents = string(append(buf, 0))
+	tok.contLen = byte(len(tok.contents))
+
+	return tok
+}
+
 // Tokenize `userInput` and returns new tokens.
 func tokenize() *Token {
 	p := userInput
@@ -242,20 +301,8 @@ func tokenize() *Token {
 
 		// String literal
 		if c == '"' {
-			q := p
-			p = p[1:]
-			for p[0] != '"' && len(p) > 0 {
-				p = p[1:]
-			}
-			if len(p) == 0 {
-				errorAt(q, "unclosed string literal")
-			}
-
-			cur = newToken(TK_STR, cur, q, len(q)-len(p))
-			cur.contents = q[1:len(q)-len(p)] + "\x00"
-			cur.contLen = byte(len(q) - len(p))
-
-			p = p[1:]
+			cur = readStringLiteral(cur, p)
+			p = p[cur.len:]
 
 			continue
 		}
