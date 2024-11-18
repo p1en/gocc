@@ -1,5 +1,3 @@
-// +build ignore
-
 // -*- c -*-
 
 // This is a line comment.
