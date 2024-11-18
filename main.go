@@ -33,6 +33,7 @@ func main() {
 		offset := 0
 		for vl := fn.locals; vl != nil; vl = vl.next {
 			v := vl.variable
+			offset = alignTo(offset, v.ty.align)
 			offset += sizeOf(v.ty)
 			v.offset = offset
 		}
