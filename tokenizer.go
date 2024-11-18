@@ -205,7 +205,7 @@ func isAlnum(c byte) bool {
 
 func startsWithReserved(p string) string {
 	// Keyword
-	kw := []string{"return", "if", "else", "while", "for", "int", "char", "sizeof"}
+	kw := []string{"return", "if", "else", "while", "for", "int", "char", "sizeof", "struct"}
 	for _, v := range kw {
 		l := len(v)
 		if startswith(p, v) && !isAlnum(p[l]) {
@@ -329,7 +329,7 @@ func tokenize() *Token {
 		}
 
 		// Single-letter punctuator
-		if strings.ContainsRune("+-*/()<>;={},&[]", rune(c)) {
+		if strings.ContainsRune("+-*/()<>;={},&[].", rune(c)) {
 			cur = newToken(TK_RESERVED, cur, p, 1)
 			p = p[1:]
 			continue

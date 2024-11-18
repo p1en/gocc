@@ -7,12 +7,22 @@ const (
 	TY_INT
 	TY_PTR
 	TY_ARRAY
+	TY_STRUCT
 )
 
 type Type struct {
 	kind      TypeKind
-	base      *Type
-	arraySize int
+	base      *Type   // pointer or array
+	arraySize int     // array
+	members   *Member // struct
+}
+
+// Struct member
+type Member struct {
+	next   *Member
+	ty     *Type
+	name   string
+	offset int
 }
 
 func newType(kind TypeKind) *Type {
@@ -48,12 +58,34 @@ func sizeOf(ty *Type) int {
 		return 1
 	case TY_INT, TY_PTR:
 		return 8
-	default:
-		if ty.kind != TY_ARRAY {
-			panic("ty.kind != TY_ARRAY")
-		}
+	case TY_ARRAY:
 		return sizeOf(ty.base) * ty.arraySize
+	default:
+		if ty.kind != TY_STRUCT {
+			panic("ty.kind != TY_STRUCT")
+		}
+
+		mem := ty.members
+		for mem.next != nil {
+			mem = mem.next
+		}
+
+		return mem.offset + sizeOf(mem.ty)
 	}
+}
+
+func findMember(ty *Type, name string) *Member {
+	if ty.kind != TY_STRUCT {
+		panic("ty.kind != TY_STRUCT")
+	}
+
+	for mem := ty.members; mem != nil; mem = mem.next {
+		if mem.name == name {
+			return mem
+		}
+	}
+
+	return nil
 }
 
 func visit(node *Node) {
@@ -102,6 +134,16 @@ func visit(node *Node) {
 		return
 	case ND_ASSIGN:
 		node.ty = node.lhs.ty
+		return
+	case ND_MEMBER:
+		if node.lhs.ty.kind != TY_STRUCT {
+			errorTok(node.tok, "not a struct")
+		}
+		node.member = findMember(node.lhs.ty, node.memberName)
+		if node.member == nil {
+			errorTok(node.tok, "specified member does not exist")
+		}
+		node.ty = node.member.ty
 		return
 	case ND_ADDR:
 		if node.lhs.ty.kind == TY_ARRAY {

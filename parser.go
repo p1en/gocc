@@ -34,6 +34,7 @@ const (
 	ND_LT                        // <
 	ND_LE                        // <=
 	ND_ASSIGN                    // =
+	ND_MEMBER                    // . (struct member access)
 	ND_ADDR                      // unary &
 	ND_DEREF                     // unary *
 	ND_RETURN                    // "return"
@@ -69,6 +70,10 @@ type Node struct {
 
 	// Block or statement expression
 	body *Node
+
+	// Struct member access
+	memberName string
+	member     *Member
 
 	// Function call
 	funcname string
@@ -182,15 +187,20 @@ func program() *Program {
 	return &Program{globals: globals, fns: head.next}
 }
 
-// basetype = ("char" | "int") "*"*
+// basetype = ("char" | "int" | struct-decl) "*"*
 func baseType() *Type {
+	if !isTypename() {
+		errorTok(token, "typename expected")
+	}
+
 	var ty *Type
 
 	if consume("char") != nil {
 		ty = charType()
-	} else {
-		expect("int")
+	} else if consume("int") != nil {
 		ty = intType()
+	} else {
+		ty = structDecl()
 	}
 
 	for consume("*") != nil {
@@ -210,6 +220,41 @@ func readTypeSuffix(base *Type) *Type {
 	base = readTypeSuffix(base)
 
 	return arrayOf(base, sz)
+}
+
+// struct-decl = "struct" "{" struct-member "}"
+func structDecl() *Type {
+	// Read struct members.
+	expect("struct")
+	expect("{")
+
+	head := Member{}
+	cur := &head
+
+	for consume("}") == nil {
+		cur.next = structMember()
+		cur = cur.next
+	}
+
+	ty := &Type{kind: TY_STRUCT, members: head.next}
+
+	// Assign offsets within the struct to members.
+	offset := 0
+	for mem := ty.members; mem != nil; mem = mem.next {
+		mem.offset = offset
+		offset += sizeOf(mem.ty)
+	}
+
+	return ty
+}
+
+// struct-member = basetype ident ("[" num "]")* ";"
+func structMember() *Member {
+	mem := &Member{ty: baseType(), name: expectIdent()}
+	mem.ty = readTypeSuffix(mem.ty)
+	expect(";")
+
+	return mem
 }
 
 func readFuncParam() *VariableList {
@@ -299,7 +344,7 @@ func readExprStmt() *Node {
 }
 
 func isTypename() bool {
-	return peek("char") != nil || peek("int") != nil
+	return peek("char") != nil || peek("int") != nil || peek("struct") != nil
 }
 
 // stmt = "return" expr ";"
@@ -498,18 +543,28 @@ func unary() *Node {
 	return postfix()
 }
 
-// postfix = primary ("[" expr "]")*
+// postfix = primary ("[" expr "]" | "." ident)*
 func postfix() *Node {
 	node := primary()
+	tok := &Token{}
 
-	for tok := consume("["); tok != nil; tok = consume("[") {
-		// x[y] is short for *(x+y)
-		exp := newBinary(ND_ADD, node, expr(), tok)
-		expect("]")
-		node = newUnary(ND_DEREF, exp, tok)
+	for {
+		if tok = consume("["); tok != nil {
+			// x[y] is short for *(x+y)
+			exp := newBinary(ND_ADD, node, expr(), tok)
+			expect("]")
+			node = newUnary(ND_DEREF, exp, tok)
+			continue
+		}
+
+		if tok = consume("."); tok != nil {
+			node = newUnary(ND_MEMBER, node, tok)
+			node.memberName = expectIdent()
+			continue
+		}
+
+		return node
 	}
-
-	return node
 }
 
 // stmt-expr = "(" "{" stmt stmt* "}" ")"

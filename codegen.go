@@ -23,6 +23,12 @@ func genAddr(node *Node) {
 	case ND_DEREF:
 		gen(node.lhs)
 		return
+	case ND_MEMBER:
+		genAddr(node.lhs)
+		fmt.Printf("  pop rax\n")
+		fmt.Printf("  add rax, %d\n", node.member.offset)
+		fmt.Printf("  push rax\n")
+		return
 	}
 
 	errorTok(node.tok, "not an lvalue")
@@ -72,7 +78,7 @@ func gen(node *Node) {
 		gen(node.lhs)
 		fmt.Printf("  add rsp, 8\n")
 		return
-	case ND_VAR:
+	case ND_VAR, ND_MEMBER:
 		genAddr(node)
 		if node.ty.kind != TY_ARRAY {
 			load(node.ty)
