@@ -298,6 +298,27 @@ func tokenize() *Token {
 			continue
 		}
 
+		// Skip line comments.
+		if startswith(p, "//") {
+			p = p[2:]
+			for p[0] != '\n' {
+				p = p[1:]
+			}
+			continue
+		}
+
+		// Skip block comments.
+		if startswith(p, "/*") {
+			for len(p) > 1 && !startswith(p, "*/") {
+				p = p[1:]
+			}
+			if len(p) < 2 {
+				errorAt(p, "unclosed block comment")
+			}
+			p = p[2:]
+			continue
+		}
+
 		// Keyword or multi-letter punctuator
 		kw := startsWithReserved(p)
 		if kw != "" {
