@@ -241,8 +241,13 @@ func structDecl() *Type {
 	// Assign offsets within the struct to members.
 	offset := 0
 	for mem := ty.members; mem != nil; mem = mem.next {
+		offset = alignTo(offset, mem.ty.align)
 		mem.offset = offset
 		offset += sizeOf(mem.ty)
+
+		if ty.align < mem.ty.align {
+			ty.align = mem.ty.align
+		}
 	}
 
 	return ty

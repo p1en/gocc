@@ -1,8 +1,6 @@
 package main
 
-import (
-	"os"
-)
+import "os"
 
 func readFile(path string) string {
 	data, err := os.ReadFile(path)
@@ -16,10 +14,6 @@ func readFile(path string) string {
 	}
 
 	return string(data)
-}
-
-func alignTo(n int, align int) int {
-	return (n + align - 1) & ^(align - 1)
 }
 
 func main() {

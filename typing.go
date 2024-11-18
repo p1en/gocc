@@ -12,6 +12,7 @@ const (
 
 type Type struct {
 	kind      TypeKind
+	align     int     // alignment
 	base      *Type   // pointer or array
 	arraySize int     // array
 	members   *Member // struct
@@ -25,27 +26,31 @@ type Member struct {
 	offset int
 }
 
-func newType(kind TypeKind) *Type {
-	return &Type{kind: kind}
+func alignTo(n int, align int) int {
+	return (n + align - 1) & ^(align - 1)
+}
+
+func newType(kind TypeKind, align int) *Type {
+	return &Type{kind: kind, align: align}
 }
 
 func charType() *Type {
-	return newType(TY_CHAR)
+	return newType(TY_CHAR, 1)
 }
 
 func intType() *Type {
-	return newType(TY_INT)
+	return newType(TY_INT, 8)
 }
 
 func pointerTo(base *Type) *Type {
-	ty := newType(TY_PTR)
+	ty := newType(TY_PTR, 8)
 	ty.base = base
 
 	return ty
 }
 
 func arrayOf(base *Type, size int) *Type {
-	ty := newType(TY_ARRAY)
+	ty := newType(TY_ARRAY, base.align)
 	ty.base = base
 	ty.arraySize = size
 
@@ -70,7 +75,9 @@ func sizeOf(ty *Type) int {
 			mem = mem.next
 		}
 
-		return mem.offset + sizeOf(mem.ty)
+		end := mem.offset + sizeOf(mem.ty)
+
+		return alignTo(end, ty.align)
 	}
 }
 
