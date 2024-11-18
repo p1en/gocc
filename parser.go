@@ -2,6 +2,13 @@ package main
 
 import "strconv"
 
+// Scope for struct tags
+type TagScope struct {
+	next *TagScope
+	name string
+	ty   *Type
+}
+
 // Variable
 type Variable struct {
 	name    string // Variable name
@@ -101,6 +108,7 @@ type Program struct {
 var locals *VariableList
 var globals *VariableList
 var scope *VariableList
+var tagScope *TagScope
 var labelcnt int
 
 // Find a variable by name.
@@ -109,6 +117,16 @@ func findVar(tok *Token) *Variable {
 		v := vl.variable
 		if len(v.name) == tok.len && tok.str[:tok.len] == v.name {
 			return v
+		}
+	}
+
+	return nil
+}
+
+func findTag(tok *Token) *TagScope {
+	for sc := tagScope; sc != nil; sc = sc.next {
+		if len(sc.name) == tok.len && tok.str[:tok.len] == sc.name {
+			return sc
 		}
 	}
 
@@ -222,12 +240,31 @@ func readTypeSuffix(base *Type) *Type {
 	return arrayOf(base, sz)
 }
 
-// struct-decl = "struct" "{" struct-member "}"
+func pushTagScope(tok *Token, ty *Type) {
+	sc := &TagScope{next: tagScope, name: tok.str[:tok.len], ty: ty}
+	tagScope = sc
+}
+
+// struct-decl = "struct" ident
+//
+//	| "struct" ident? "{" struct-member "}"
 func structDecl() *Type {
-	// Read struct members.
 	expect("struct")
+
+	// Read a struct tag.
+	tag := consumeIdent()
+	if tag != nil && peek("{") == nil {
+		sc := findTag(tag)
+		if sc == nil {
+			errorTok(tag, "unknown struct type")
+		}
+
+		return sc.ty
+	}
+
 	expect("{")
 
+	// Read struct members.
 	head := Member{}
 	cur := &head
 
@@ -248,6 +285,11 @@ func structDecl() *Type {
 		if ty.align < mem.ty.align {
 			ty.align = mem.ty.align
 		}
+	}
+
+	// Register the struct type if a name was given.
+	if tag != nil {
+		pushTagScope(tag, ty)
 	}
 
 	return ty
@@ -323,9 +365,16 @@ func globalVar() {
 }
 
 // declaration = basetype ident ("[" num "]")* ("=" expr) ";"
+//
+//	| basetype ";"
 func declaration() *Node {
 	tok := token
 	ty := baseType()
+
+	if consume(";") != nil {
+		return newNode(ND_NULL, tok)
+	}
+
 	name := expectIdent()
 	ty = readTypeSuffix(ty)
 	v := pushVar(name, ty, true)
@@ -418,12 +467,14 @@ func stmt() *Node {
 		head := &Node{}
 		cur := head
 
-		sc := scope
+		sc1 := scope
+		sc2 := tagScope
 		for consume("}") == nil {
 			cur.next = stmt()
 			cur = cur.next
 		}
-		scope = sc
+		scope = sc1
+		tagScope = sc2
 
 		node := newNode(ND_BLOCK, tok)
 		node.body = head.next
@@ -576,7 +627,8 @@ func postfix() *Node {
 //
 // Statement expression is a GNU C extension.
 func stmtExpr(tok *Token) *Node {
-	sc := scope
+	sc1 := scope
+	sc2 := tagScope
 
 	node := newNode(ND_STMT_EXPR, tok)
 	node.body = stmt()
@@ -588,7 +640,8 @@ func stmtExpr(tok *Token) *Node {
 	}
 	expect(")")
 
-	scope = sc
+	scope = sc1
+	tagScope = sc2
 
 	if cur.kind != ND_EXPR_STMT {
 		errorTok(cur.tok, "stmt expr returning void is not supported")
