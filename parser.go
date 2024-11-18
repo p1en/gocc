@@ -95,18 +95,12 @@ type Program struct {
 
 var locals *VariableList
 var globals *VariableList
+var scope *VariableList
 var labelcnt int
 
-// Find a local variable by name.
+// Find a variable by name.
 func findVar(tok *Token) *Variable {
-	for vl := locals; vl != nil; vl = vl.next {
-		v := vl.variable
-		if len(v.name) == tok.len && tok.str[:tok.len] == v.name {
-			return v
-		}
-	}
-
-	for vl := globals; vl != nil; vl = vl.next {
+	for vl := scope; vl != nil; vl = vl.next {
 		v := vl.variable
 		if len(v.name) == tok.len && tok.str[:tok.len] == v.name {
 			return v
@@ -147,6 +141,9 @@ func pushVar(name string, ty *Type, isLocal bool) *Variable {
 		vl.next = globals
 		globals = vl
 	}
+
+	sc := &VariableList{variable: v, next: scope}
+	scope = sc
 
 	return v
 }
@@ -371,10 +368,12 @@ func stmt() *Node {
 		head := &Node{}
 		cur := head
 
+		sc := scope
 		for consume("}") == nil {
 			cur.next = stmt()
 			cur = cur.next
 		}
+		scope = sc
 
 		node := newNode(ND_BLOCK, tok)
 		node.body = head.next
@@ -517,6 +516,8 @@ func postfix() *Node {
 //
 // Statement expression is a GNU C extension.
 func stmtExpr(tok *Token) *Node {
+	sc := scope
+
 	node := newNode(ND_STMT_EXPR, tok)
 	node.body = stmt()
 	cur := node.body
@@ -526,6 +527,8 @@ func stmtExpr(tok *Token) *Node {
 		cur = cur.next
 	}
 	expect(")")
+
+	scope = sc
 
 	if cur.kind != ND_EXPR_STMT {
 		errorTok(cur.tok, "stmt expr returning void is not supported")
