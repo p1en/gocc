@@ -31,6 +31,7 @@ type Token struct {
 	contLen  byte   // String literal length
 }
 
+var filename string
 var userInput string
 var token *Token
 
@@ -59,10 +60,36 @@ func reportError(format string, a ...any) {
 	os.Exit(1)
 }
 
-// Reports an error location and exit.
+// Reports an error message in the following format and exit.
 func verrorAt(loc string, format string, a ...any) {
-	pos := len(userInput) - len(loc)
-	fmt.Fprintf(os.Stderr, "%s\n", userInput)
+	// Find a line containing `loc`.
+	line := loc
+	for strings.Index(userInput, line) > 0 && line[0] != '\n' {
+		line = line[1:]
+	}
+
+	end := loc
+	for end[0] != '\n' {
+		end = end[1:]
+	}
+
+	// Get a line number.
+	lineNum := 1
+	for _, c := range userInput {
+		if c == '\n' {
+			lineNum++
+		}
+		if strings.HasPrefix(userInput, line) {
+			break
+		}
+	}
+
+	// Print out the line.
+	indent, _ := fmt.Fprintf(os.Stderr, "%s:%d: ", filename, lineNum)
+	fmt.Fprintf(os.Stderr, "%s\n", line)
+
+	// Show the error message.
+	pos := strings.Index(loc, line) + indent
 	fmt.Fprintf(os.Stderr, "%*s", pos, " ")
 	fmt.Fprintf(os.Stderr, "^ ")
 	fmt.Fprintf(os.Stderr, format, a...)
@@ -266,7 +293,7 @@ func tokenize() *Token {
 		c := p[0]
 
 		// Skip whitespace characters.
-		if c == ' ' {
+		if unicode.IsSpace(rune(c)) {
 			p = p[1:]
 			continue
 		}

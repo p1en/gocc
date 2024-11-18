@@ -14,7 +14,7 @@ assert() {
   expected="$1"
   input="$2"
 
-  ./gocc "$input" > tmp.s
+  ./gocc <(echo "$input") > tmp.s
   gcc -static -o tmp tmp.s tmp2.o -z noexecstack
   ./tmp
   actual="$?"
