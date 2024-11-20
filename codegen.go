@@ -3,6 +3,7 @@ package main
 import "fmt"
 
 var argreg1 = []string{"dil", "sil", "dl", "cl", "r8b", "r9b"}
+var argreg4 = []string{"edi", "esi", "edx", "ecx", "r8d", "r9d"}
 var argreg8 = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
 
 var labelseq int
@@ -44,9 +45,16 @@ func genLval(node *Node) {
 func load(ty *Type) {
 	fmt.Printf("  pop rax\n")
 
-	if sizeOf(ty) == 1 {
+	sz := sizeOf(ty)
+	switch sz {
+	case 1:
 		fmt.Printf("  movsx rax, byte ptr [rax]\n")
-	} else {
+	case 4:
+		fmt.Printf("  movsxd rax, dword ptr [rax]\n")
+	default:
+		if sz != 8 {
+			panic("sz != 8")
+		}
 		fmt.Printf("  mov rax, [rax]\n")
 	}
 
@@ -57,9 +65,22 @@ func store(ty *Type) {
 	fmt.Printf("  pop rdi\n")
 	fmt.Printf("  pop rax\n")
 
-	if sizeOf(ty) == 1 {
+	// if sizeOf(ty) == 1 {
+	// 	fmt.Printf("  mov [rax], dil\n")
+	// } else {
+	// 	fmt.Printf("  mov [rax], rdi\n")
+	// }
+
+	sz := sizeOf(ty)
+	switch sz {
+	case 1:
 		fmt.Printf("  mov [rax], dil\n")
-	} else {
+	case 4:
+		fmt.Printf("  mov [rax], edi\n")
+	default:
+		if sz != 8 {
+			panic("sz != 8")
+		}
 		fmt.Printf("  mov [rax], rdi\n")
 	}
 
@@ -258,9 +279,12 @@ func emitData(prog *Program) {
 
 func loadArg(v *Variable, idx int) {
 	sz := sizeOf(v.ty)
-	if sz == 1 {
+	switch sz {
+	case 1:
 		fmt.Printf("  mov [rbp-%d], %s\n", v.offset, argreg1[idx])
-	} else {
+	case 4:
+		fmt.Printf("  mov [rbp-%d], %s\n", v.offset, argreg4[idx])
+	default:
 		if sz != 8 {
 			panic("sz != 8")
 		}

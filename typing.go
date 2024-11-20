@@ -39,7 +39,7 @@ func charType() *Type {
 }
 
 func intType() *Type {
-	return newType(TY_INT, 8)
+	return newType(TY_INT, 4)
 }
 
 func pointerTo(base *Type) *Type {
@@ -61,7 +61,9 @@ func sizeOf(ty *Type) int {
 	switch ty.kind {
 	case TY_CHAR:
 		return 1
-	case TY_INT, TY_PTR:
+	case TY_INT:
+		return 4
+	case TY_PTR:
 		return 8
 	case TY_ARRAY:
 		return sizeOf(ty.base) * ty.arraySize
