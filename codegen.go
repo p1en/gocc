@@ -68,6 +68,12 @@ func store(ty *Type) {
 	fmt.Printf("  pop rdi\n")
 	fmt.Printf("  pop rax\n")
 
+	if ty.kind == TY_BOOL {
+		fmt.Printf("  cmp rdi, 0\n")
+		fmt.Printf("  setne dil\n")
+		fmt.Printf("  movzb rdi, dil\n")
+	}
+
 	sz := sizeOf(ty)
 	switch sz {
 	case 1:

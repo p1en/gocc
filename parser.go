@@ -236,7 +236,7 @@ func program() *Program {
 }
 
 // type-specifier = builtin-type | struct-decl | typedef-name
-// builtin-type   = "void" | "char" | "short" | "int" | "long"
+// builtin-type   = "void" | "_Bool" | "char" | "short" | "int" | "long"
 func typeSpecifier() *Type {
 	if !isTypename() {
 		errorTok(token, "typename expected")
@@ -244,6 +244,8 @@ func typeSpecifier() *Type {
 
 	if consume("void") != nil {
 		return voidType()
+	} else if consume("_Bool") != nil {
+		return boolType()
 	} else if consume("char") != nil {
 		return charType()
 	} else if consume("short") != nil {
@@ -465,6 +467,7 @@ func readExprStmt() *Node {
 
 func isTypename() bool {
 	return peek("void") != nil ||
+		peek("_Bool") != nil ||
 		peek("char") != nil ||
 		peek("short") != nil ||
 		peek("int") != nil ||
