@@ -10,6 +10,7 @@ const (
 	TY_PTR
 	TY_ARRAY
 	TY_STRUCT
+	TY_FUNC
 )
 
 type Type struct {
@@ -18,6 +19,7 @@ type Type struct {
 	base      *Type   // pointer or array
 	arraySize int     // array
 	members   *Member // struct
+	returnTy  *Type   // function
 }
 
 // Struct member
@@ -50,6 +52,13 @@ func intType() *Type {
 
 func longType() *Type {
 	return newType(TY_LONG, 8)
+}
+
+func funcType(returnTy *Type) *Type {
+	ty := newType(TY_FUNC, 1)
+	ty.returnTy = returnTy
+
+	return ty
 }
 
 func pointerTo(base *Type) *Type {
@@ -130,7 +139,7 @@ func visit(node *Node) {
 	}
 
 	switch node.kind {
-	case ND_MUL, ND_DIV, ND_EQ, ND_NE, ND_LT, ND_LE, ND_FUNCALL, ND_NUM:
+	case ND_MUL, ND_DIV, ND_EQ, ND_NE, ND_LT, ND_LE, ND_NUM:
 		node.ty = intType()
 		return
 	case ND_VAR:
