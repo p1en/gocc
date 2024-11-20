@@ -17,6 +17,7 @@ const (
 
 type Type struct {
 	kind      TypeKind
+	isTypedef bool    // typedef
 	align     int     // alignment
 	base      *Type   // pointer or array
 	arraySize int     // array

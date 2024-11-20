@@ -236,29 +236,99 @@ func program() *Program {
 }
 
 // type-specifier = builtin-type | struct-decl | typedef-name
-// builtin-type   = "void" | "_Bool" | "char" | "short" | "int" | "long"
+// builtin-type   = "void"
+//
+//	| "_Bool"
+//	| "char"
+//	| "short" | "short" "int" | "int" "short"
+//	| "int"
+//	| "long" | "long" "int" | "int" "long"
+//
+// Note that "typedef" can appear anywhere in a type-specifier.
 func typeSpecifier() *Type {
 	if !isTypename() {
 		errorTok(token, "typename expected")
 	}
 
-	if consume("void") != nil {
-		return voidType()
-	} else if consume("_Bool") != nil {
-		return boolType()
-	} else if consume("char") != nil {
-		return charType()
-	} else if consume("short") != nil {
-		return shortType()
-	} else if consume("int") != nil {
-		return intType()
-	} else if consume("long") != nil {
-		return longType()
-	} else if consume("struct") != nil {
-		return structDecl()
-	} else {
-		return findVar(consumeIdent()).typeDef
+	var ty *Type
+
+	const (
+		VOID  = 1 << 1
+		BOOL  = 1 << 3
+		CHAR  = 1 << 5
+		SHORT = 1 << 7
+		INT   = 1 << 9
+		LONG  = 1 << 11
+	)
+
+	baseType := 0
+	var userType *Type
+
+	isTypedef := false
+
+	for {
+		// Read one token at a time.
+		tok := token
+		if consume("typedef") != nil {
+			isTypedef = true
+		} else if consume("void") != nil {
+			baseType += VOID
+		} else if consume("_Bool") != nil {
+			baseType += BOOL
+		} else if consume("char") != nil {
+			baseType += CHAR
+		} else if consume("short") != nil {
+			baseType += SHORT
+		} else if consume("int") != nil {
+			baseType += INT
+		} else if consume("long") != nil {
+			baseType += LONG
+		} else if peek("struct") != nil {
+			if baseType != 0 || userType != nil {
+				break
+			}
+			userType = structDecl()
+		} else {
+			if baseType != 0 || userType != nil {
+				break
+			}
+			ty := findTypedef(token)
+			if ty == nil {
+				break
+			}
+			token = token.next
+			userType = ty
+		}
+
+		switch baseType {
+		case VOID:
+			ty = voidType()
+		case BOOL:
+			ty = boolType()
+		case CHAR:
+			ty = charType()
+		case SHORT, SHORT + INT:
+			ty = shortType()
+		case INT:
+			ty = intType()
+		case LONG, LONG + INT:
+			ty = longType()
+		case 0:
+			// If there's no type specifier, it becomes int.
+			// For example, `typedef x` defines x as an alias for int.
+			if userType != nil {
+				ty = userType
+			} else {
+				ty = intType()
+			}
+		default:
+			errorTok(tok, "invalid type")
+		}
 	}
+
+	ty.isTypedef = isTypedef
+
+	return ty
 }
 
 // declarator = "*"* ("(" declarator ")" | ident) type-suffix
@@ -303,6 +373,7 @@ func pushTagScope(tok *Token, ty *Type) {
 //	| "struct" ident? "{" struct-member "}"
 func structDecl() *Type {
 	// Read a struct tag.
+	expect("struct")
 	tag := consumeIdent()
 	if tag != nil && peek("{") == nil {
 		sc := findTag(tag)
@@ -442,6 +513,14 @@ func declaration() *Node {
 	ty = declarator(ty, &name)
 	ty = typeSuffix(ty)
 
+	if ty.isTypedef {
+		expect(";")
+		ty.isTypedef = false
+		pushScope(name).typeDef = ty
+
+		return newNode(ND_NULL, tok)
+	}
+
 	if ty.kind == TY_VOID {
 		errorTok(tok, "variable declared void")
 	}
@@ -473,6 +552,7 @@ func isTypename() bool {
 		peek("int") != nil ||
 		peek("long") != nil ||
 		peek("struct") != nil ||
+		peek("typedef") != nil ||
 		findTypedef(token) != nil
 }
 
@@ -482,7 +562,6 @@ func isTypename() bool {
 //	| "while" "(" expr ")" stmt
 //	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
 //	| "{" stmt* "}"
-//	| "typedef" type-specifier declarator type-suffix ";"
 //	| declaration
 //	| expr ";"
 func stmt() *Node {
@@ -556,18 +635,6 @@ func stmt() *Node {
 		node.body = head.next
 
 		return node
-	}
-
-	if tok = consume("typedef"); tok != nil {
-		ty := typeSpecifier()
-		name := ""
-		ty = declarator(ty, &name)
-		ty = typeSuffix(ty)
-		expect(";")
-
-		pushScope(name).typeDef = ty
-
-		return newNode(ND_NULL, tok)
 	}
 
 	if isTypename() {
