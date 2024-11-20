@@ -2,6 +2,14 @@ package main
 
 import "strconv"
 
+// Scope for local variables, global variables or typedefs
+type VariableScope struct {
+	next     *VariableScope
+	name     string
+	variable *Variable
+	typeDef  *Type
+}
+
 // Scope for struct tags
 type TagScope struct {
 	next *TagScope
@@ -107,16 +115,17 @@ type Program struct {
 
 var locals *VariableList
 var globals *VariableList
-var scope *VariableList
+
+var varScope *VariableScope
 var tagScope *TagScope
+
 var labelcnt int
 
-// Find a variable by name.
-func findVar(tok *Token) *Variable {
-	for vl := scope; vl != nil; vl = vl.next {
-		v := vl.variable
-		if len(v.name) == tok.len && tok.str[:tok.len] == v.name {
-			return v
+// Find a variable or a typedef by name.
+func findVar(tok *Token) *VariableScope {
+	for sc := varScope; sc != nil; sc = sc.next {
+		if len(sc.name) == tok.len && tok.str[:tok.len] == sc.name {
+			return sc
 		}
 	}
 
@@ -153,6 +162,13 @@ func newVar(variable *Variable, tok *Token) *Node {
 	return &Node{kind: ND_VAR, variable: variable, tok: tok}
 }
 
+func pushScope(name string) *VariableScope {
+	sc := &VariableScope{name: name, next: varScope}
+	varScope = sc
+
+	return sc
+}
+
 func pushVar(name string, ty *Type, isLocal bool) *Variable {
 	v := &Variable{name: name, ty: ty, isLocal: isLocal}
 	vl := &VariableList{variable: v}
@@ -165,10 +181,20 @@ func pushVar(name string, ty *Type, isLocal bool) *Variable {
 		globals = vl
 	}
 
-	sc := &VariableList{variable: v, next: scope}
-	scope = sc
+	pushScope(name).variable = v
 
 	return v
+}
+
+func findTypedef(tok *Token) *Type {
+	if tok.kind == TK_IDENT {
+		sc := findVar(token)
+		if sc != nil {
+			return sc.typeDef
+		}
+	}
+
+	return nil
 }
 
 func newLabel() string {
@@ -180,7 +206,7 @@ func newLabel() string {
 
 func isFunction() bool {
 	tok := token
-	baseType()
+	basetype()
 	isFunc := (consumeIdent() != nil) && (consume("(") != nil)
 	token = tok
 
@@ -205,8 +231,8 @@ func program() *Program {
 	return &Program{globals: globals, fns: head.next}
 }
 
-// basetype = ("char" | "int" | struct-decl) "*"*
-func baseType() *Type {
+// basetype = ("char" | "int" | struct-decl | typedef-name) "*"*
+func basetype() *Type {
 	if !isTypename() {
 		errorTok(token, "typename expected")
 	}
@@ -217,8 +243,14 @@ func baseType() *Type {
 		ty = charType()
 	} else if consume("int") != nil {
 		ty = intType()
-	} else {
+	} else if consume("struct") != nil {
 		ty = structDecl()
+	} else {
+		ty = findVar(consumeIdent()).typeDef
+	}
+
+	if ty == nil {
+		panic("ty == nil")
 	}
 
 	for consume("*") != nil {
@@ -249,8 +281,6 @@ func pushTagScope(tok *Token, ty *Type) {
 //
 //	| "struct" ident? "{" struct-member "}"
 func structDecl() *Type {
-	expect("struct")
-
 	// Read a struct tag.
 	tag := consumeIdent()
 	if tag != nil && peek("{") == nil {
@@ -297,7 +327,7 @@ func structDecl() *Type {
 
 // struct-member = basetype ident ("[" num "]")* ";"
 func structMember() *Member {
-	mem := &Member{ty: baseType(), name: expectIdent()}
+	mem := &Member{ty: basetype(), name: expectIdent()}
 	mem.ty = readTypeSuffix(mem.ty)
 	expect(";")
 
@@ -305,7 +335,7 @@ func structMember() *Member {
 }
 
 func readFuncParam() *VariableList {
-	ty := baseType()
+	ty := basetype()
 	name := expectIdent()
 	ty = readTypeSuffix(ty)
 
@@ -336,7 +366,7 @@ func function() *Function {
 	locals = nil
 
 	fn := &Function{}
-	baseType()
+	basetype()
 	fn.name = expectIdent()
 	expect("(")
 	fn.params = readFuncParams()
@@ -357,7 +387,7 @@ func function() *Function {
 
 // global-var = basetype ident ("[" num "]")* ";"
 func globalVar() {
-	ty := baseType()
+	ty := basetype()
 	name := expectIdent()
 	ty = readTypeSuffix(ty)
 	expect(";")
@@ -369,7 +399,7 @@ func globalVar() {
 //	| basetype ";"
 func declaration() *Node {
 	tok := token
-	ty := baseType()
+	ty := basetype()
 
 	if consume(";") != nil {
 		return newNode(ND_NULL, tok)
@@ -398,7 +428,7 @@ func readExprStmt() *Node {
 }
 
 func isTypename() bool {
-	return peek("char") != nil || peek("int") != nil || peek("struct") != nil
+	return peek("char") != nil || peek("int") != nil || peek("struct") != nil || findTypedef(token) != nil
 }
 
 // stmt = "return" expr ";"
@@ -407,6 +437,7 @@ func isTypename() bool {
 //	| "while" "(" expr ")" stmt
 //	| "for" "(" expr? ";" expr? ";" expr? ")" stmt
 //	| "{" stmt* "}"
+//	| "typedef" basetype ident ("[" num "]")* ";"
 //	| declaration
 //	| expr ";"
 func stmt() *Node {
@@ -467,19 +498,29 @@ func stmt() *Node {
 		head := &Node{}
 		cur := head
 
-		sc1 := scope
+		sc1 := varScope
 		sc2 := tagScope
 		for consume("}") == nil {
 			cur.next = stmt()
 			cur = cur.next
 		}
-		scope = sc1
+		varScope = sc1
 		tagScope = sc2
 
 		node := newNode(ND_BLOCK, tok)
 		node.body = head.next
 
 		return node
+	}
+
+	if tok = consume("typedef"); tok != nil {
+		ty := basetype()
+		name := expectIdent()
+		ty = readTypeSuffix(ty)
+		expect(";")
+		pushScope(name).typeDef = ty
+
+		return newNode(ND_NULL, tok)
 	}
 
 	if isTypename() {
@@ -635,7 +676,7 @@ func postfix() *Node {
 //
 // Statement expression is a GNU C extension.
 func stmtExpr(tok *Token) *Node {
-	sc1 := scope
+	sc1 := varScope
 	sc2 := tagScope
 
 	node := newNode(ND_STMT_EXPR, tok)
@@ -648,7 +689,7 @@ func stmtExpr(tok *Token) *Node {
 	}
 	expect(")")
 
-	scope = sc1
+	varScope = sc1
 	tagScope = sc2
 
 	if cur.kind != ND_EXPR_STMT {
@@ -710,11 +751,11 @@ func primary() *Node {
 			return node
 		}
 
-		variable := findVar(tok)
-		if variable == nil {
-			errorTok(tok, "undefined variable")
+		sc := findVar(tok)
+		if sc != nil && sc.variable != nil {
+			return newVar(sc.variable, tok)
 		}
-		return newVar(variable, tok)
+		errorTok(tok, "undefined variable")
 	}
 
 	tok = token
