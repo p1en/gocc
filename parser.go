@@ -231,7 +231,8 @@ func program() *Program {
 	return &Program{globals: globals, fns: head.next}
 }
 
-// basetype = ("char" | "int" | struct-decl | typedef-name) "*"*
+// basetype = type "*"*
+// type = "char" | "short" | "int" | "long" | struct-decl | typedef-name
 func basetype() *Type {
 	if !isTypename() {
 		errorTok(token, "typename expected")
@@ -241,8 +242,12 @@ func basetype() *Type {
 
 	if consume("char") != nil {
 		ty = charType()
+	} else if consume("short") != nil {
+		ty = shortType()
 	} else if consume("int") != nil {
 		ty = intType()
+	} else if consume("long") != nil {
+		ty = longType()
 	} else if consume("struct") != nil {
 		ty = structDecl()
 	} else {
@@ -428,7 +433,12 @@ func readExprStmt() *Node {
 }
 
 func isTypename() bool {
-	return peek("char") != nil || peek("int") != nil || peek("struct") != nil || findTypedef(token) != nil
+	return peek("char") != nil ||
+		peek("short") != nil ||
+		peek("int") != nil ||
+		peek("long") != nil ||
+		peek("struct") != nil ||
+		findTypedef(token) != nil
 }
 
 // stmt = "return" expr ";"

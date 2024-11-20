@@ -3,6 +3,7 @@ package main
 import "fmt"
 
 var argreg1 = []string{"dil", "sil", "dl", "cl", "r8b", "r9b"}
+var argreg2 = []string{"di", "si", "dx", "cx", "r8w", "r9w"}
 var argreg4 = []string{"edi", "esi", "edx", "ecx", "r8d", "r9d"}
 var argreg8 = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
 
@@ -49,6 +50,8 @@ func load(ty *Type) {
 	switch sz {
 	case 1:
 		fmt.Printf("  movsx rax, byte ptr [rax]\n")
+	case 2:
+		fmt.Printf("  movsx rax, word ptr [rax]\n")
 	case 4:
 		fmt.Printf("  movsxd rax, dword ptr [rax]\n")
 	default:
@@ -65,16 +68,12 @@ func store(ty *Type) {
 	fmt.Printf("  pop rdi\n")
 	fmt.Printf("  pop rax\n")
 
-	// if sizeOf(ty) == 1 {
-	// 	fmt.Printf("  mov [rax], dil\n")
-	// } else {
-	// 	fmt.Printf("  mov [rax], rdi\n")
-	// }
-
 	sz := sizeOf(ty)
 	switch sz {
 	case 1:
 		fmt.Printf("  mov [rax], dil\n")
+	case 2:
+		fmt.Printf("  mov [rax], di\n")
 	case 4:
 		fmt.Printf("  mov [rax], edi\n")
 	default:
@@ -282,6 +281,8 @@ func loadArg(v *Variable, idx int) {
 	switch sz {
 	case 1:
 		fmt.Printf("  mov [rbp-%d], %s\n", v.offset, argreg1[idx])
+	case 2:
+		fmt.Printf("  mov [rbp-%d], %s\n", v.offset, argreg2[idx])
 	case 4:
 		fmt.Printf("  mov [rbp-%d], %s\n", v.offset, argreg4[idx])
 	default:

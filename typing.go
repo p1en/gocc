@@ -4,7 +4,9 @@ type TypeKind int
 
 const (
 	TY_CHAR TypeKind = iota
+	TY_SHORT
 	TY_INT
+	TY_LONG
 	TY_PTR
 	TY_ARRAY
 	TY_STRUCT
@@ -38,8 +40,16 @@ func charType() *Type {
 	return newType(TY_CHAR, 1)
 }
 
+func shortType() *Type {
+	return newType(TY_SHORT, 2)
+}
+
 func intType() *Type {
 	return newType(TY_INT, 4)
+}
+
+func longType() *Type {
+	return newType(TY_LONG, 8)
 }
 
 func pointerTo(base *Type) *Type {
@@ -61,9 +71,11 @@ func sizeOf(ty *Type) int {
 	switch ty.kind {
 	case TY_CHAR:
 		return 1
+	case TY_SHORT:
+		return 2
 	case TY_INT:
 		return 4
-	case TY_PTR:
+	case TY_LONG, TY_PTR:
 		return 8
 	case TY_ARRAY:
 		return sizeOf(ty.base) * ty.arraySize
