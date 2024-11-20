@@ -3,7 +3,8 @@ package main
 type TypeKind int
 
 const (
-	TY_CHAR TypeKind = iota
+	TY_VOID TypeKind = iota
+	TY_CHAR
 	TY_SHORT
 	TY_INT
 	TY_LONG
@@ -36,6 +37,10 @@ func alignTo(n int, align int) int {
 
 func newType(kind TypeKind, align int) *Type {
 	return &Type{kind: kind, align: align}
+}
+
+func voidType() *Type {
+	return newType(TY_VOID, 1)
 }
 
 func charType() *Type {
@@ -77,6 +82,10 @@ func arrayOf(base *Type, size int) *Type {
 }
 
 func sizeOf(ty *Type) int {
+	if ty.kind == TY_VOID {
+		panic("ty.kind == TY_VOID")
+	}
+
 	switch ty.kind {
 	case TY_CHAR:
 		return 1
@@ -187,6 +196,9 @@ func visit(node *Node) {
 			errorTok(node.tok, "invalid pointer dereference")
 		}
 		node.ty = node.lhs.ty.base
+		if node.ty.kind == TY_VOID {
+			errorTok(node.tok, "dereferencing a void pointer")
+		}
 		return
 	case ND_SIZEOF:
 		node.kind = ND_NUM

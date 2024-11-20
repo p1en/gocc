@@ -208,7 +208,7 @@ func startsWithReserved(p string) string {
 	kw := []string{
 		"return", "if", "else", "while", "for", "int",
 		"char", "sizeof", "struct", "typedef", "short",
-		"long",
+		"long", "void",
 	}
 	for _, v := range kw {
 		l := len(v)
