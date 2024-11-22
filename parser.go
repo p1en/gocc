@@ -226,11 +226,17 @@ func program() *Program {
 
 	for !atEOF() {
 		if isFunction() {
-			cur.next = function()
+			fn := function()
+			if fn == nil {
+				continue
+			}
+			cur.next = fn
 			cur = cur.next
-		} else {
-			globalVar()
+
+			continue
 		}
+
+		globalVar()
 	}
 
 	return &Program{globals: globals, fns: head.next}
@@ -481,7 +487,7 @@ func readFuncParams() *VariableList {
 	return head
 }
 
-// function = type-specifier declarator "(" params? ")" "{" stmt* "}"
+// function = type-specifier declarator "(" params? ")" ("{" stmt* "}" | ";")
 // params   = param ("," param)*
 // param    = type-specifier declarator type-suffix
 func function() *Function {
@@ -499,11 +505,15 @@ func function() *Function {
 	fn.name = name
 	expect("(")
 	fn.params = readFuncParams()
-	expect("{")
+
+	if consume(";") != nil {
+		return nil
+	}
 
 	// Read function body
 	head := &Node{}
 	cur := head
+	expect("{")
 	for consume("}") == nil {
 		cur.next = stmt()
 		cur = cur.next
