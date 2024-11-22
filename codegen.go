@@ -239,6 +239,8 @@ func gen(node *Node) {
 		fmt.Printf(".Lend%d:\n", seq)
 		fmt.Printf("  push rax\n")
 
+		truncate(node.ty)
+
 		return
 	case ND_RETURN:
 		gen(node.lhs)
