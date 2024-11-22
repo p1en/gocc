@@ -287,6 +287,34 @@ func readStringLiteral(cur *Token, start string) *Token {
 	return tok
 }
 
+func readCharLiteral(cur *Token, start string) *Token {
+	p := start[1:]
+	if p[0] == 0 {
+		errorAt(start, "unclosed char literal")
+	}
+
+	var c byte
+	if p[0] == '\\' {
+		p = p[1:]
+		c = getEscapeChar(p[0])
+		p = p[1:]
+	} else {
+		c = p[0]
+		p = p[1:]
+	}
+
+	if p[0] != '\'' {
+		errorAt(start, "char literal too long")
+	}
+
+	p = p[1:]
+
+	tok := newToken(TK_NUM, cur, start, len(start)-len(p))
+	tok.val = int(c)
+
+	return tok
+}
+
 // Tokenize `userInput` and returns new tokens.
 func tokenize() *Token {
 	p := userInput
@@ -355,7 +383,12 @@ func tokenize() *Token {
 		if c == '"' {
 			cur = readStringLiteral(cur, p)
 			p = p[cur.len:]
+			continue
+		}
 
+		if c == '\'' {
+			cur = readCharLiteral(cur, p)
+			p = p[cur.len:]
 			continue
 		}
 
