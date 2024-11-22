@@ -63,6 +63,7 @@ const (
 	ND_STMT_EXPR                 // Statement expression
 	ND_VAR                       // Variable
 	ND_NUM                       // Integer
+	ND_CAST                      // Type cast
 	ND_NULL                      // Empty statement
 )
 
@@ -742,39 +743,58 @@ func add() *Node {
 	}
 }
 
-// mul = unary ("*" unary | "/" unary)*
+// mul = cast ("*" cast | "/" cast)*
 func mul() *Node {
-	node := unary()
+	node := cast()
 	var tok *Token
 
 	for {
 		if tok = consume("*"); tok != nil {
-			node = newBinary(ND_MUL, node, unary(), tok)
+			node = newBinary(ND_MUL, node, cast(), tok)
 		} else if tok = consume("/"); tok != nil {
-			node = newBinary(ND_DIV, node, unary(), tok)
+			node = newBinary(ND_DIV, node, cast(), tok)
 		} else {
 			return node
 		}
 	}
 }
 
-// unary = ("+" | "-" | "*" | "&")? unary
+// cast = "(" type-name ")" cast | unary
+func cast() *Node {
+	tok := token
+
+	if consume("(") != nil {
+		if isTypename() {
+			ty := typeName()
+			expect(")")
+			node := newUnary(ND_CAST, cast(), tok)
+			node.ty = ty
+
+			return node
+		}
+		token = tok
+	}
+
+	return unary()
+}
+
+// unary = ("+" | "-" | "*" | "&")? cast
 //
 //	| postfix
 func unary() *Node {
 	var tok *Token
 
 	if consume("+") != nil {
-		return unary()
+		return cast()
 	}
 	if tok = consume("-"); tok != nil {
-		return newBinary(ND_SUB, newNum(0, tok), unary(), tok)
+		return newBinary(ND_SUB, newNum(0, tok), cast(), tok)
 	}
 	if tok = consume("&"); tok != nil {
-		return newUnary(ND_ADDR, unary(), tok)
+		return newUnary(ND_ADDR, cast(), tok)
 	}
 	if tok = consume("*"); tok != nil {
-		return newUnary(ND_DEREF, unary(), tok)
+		return newUnary(ND_DEREF, cast(), tok)
 	}
 
 	return postfix()

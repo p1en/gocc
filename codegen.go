@@ -92,6 +92,27 @@ func store(ty *Type) {
 	fmt.Printf("  push rdi\n")
 }
 
+func truncate(ty *Type) {
+	fmt.Printf("  pop rax\n")
+
+	if ty.kind == TY_BOOL {
+		fmt.Printf("  cmp rax, 0\n")
+		fmt.Printf("  setne al\n")
+	}
+
+	sz := sizeOf(ty)
+	switch sz {
+	case 1:
+		fmt.Printf("  movsx rax, al\n")
+	case 2:
+		fmt.Printf("  movsx rax, ax\n")
+	case 4:
+		fmt.Printf("  movsxd rax, eax\n")
+	}
+
+	fmt.Printf("  push rax\n")
+}
+
 // Generate code for a given node.
 func gen(node *Node) {
 	switch node.kind {
@@ -223,6 +244,10 @@ func gen(node *Node) {
 		gen(node.lhs)
 		fmt.Printf("  pop rax\n")
 		fmt.Printf("  jmp .Lreturn.%s\n", funcname)
+		return
+	case ND_CAST:
+		gen(node.lhs)
+		truncate(node.ty)
 		return
 	}
 
