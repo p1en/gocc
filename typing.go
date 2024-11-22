@@ -154,9 +154,15 @@ func visit(node *Node) {
 	}
 
 	switch node.kind {
-	case ND_MUL, ND_DIV, ND_EQ, ND_NE, ND_LT, ND_LE, ND_NUM:
+	case ND_MUL, ND_DIV, ND_EQ, ND_NE, ND_LT, ND_LE:
 		node.ty = intType()
 		return
+	case ND_NUM:
+		if node.val >= -1<<31 && node.val <= 1<<31-1 {
+			node.ty = intType()
+		} else {
+			node.ty = longType()
+		}
 	case ND_VAR:
 		node.ty = node.variable.ty
 		return

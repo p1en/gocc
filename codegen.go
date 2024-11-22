@@ -98,7 +98,12 @@ func gen(node *Node) {
 	case ND_NULL:
 		return
 	case ND_NUM:
-		fmt.Printf("  push %d\n", node.val)
+		if node.val >= -1<<31 && node.val <= 1<<31-1 {
+			fmt.Printf("  push %d\n", node.val)
+		} else {
+			fmt.Printf("  movabs rax, %d\n", node.val)
+			fmt.Printf("  push rax\n")
+		}
 		return
 	case ND_EXPR_STMT:
 		gen(node.lhs)
